@@ -1,0 +1,79 @@
+# Document Organizer — config (VPS / cloud deployment)
+# Copy to config.yaml on your VPS.
+# API keys: set as environment variables, not in this file.
+#
+# This config is designed for Render.com, Fly.io, Railway, or any VPS.
+# Persistent storage must be mounted at /data (or override below).
+
+documents_root: "/data/documents"
+index_root: "/data/index"
+
+scan:
+  include:
+    - "**/*.md"
+    - "**/*.pdf"
+    - "**/*.png"
+    - "**/*.jpg"
+    - "**/*.jpeg"
+  exclude:
+    - ".git/**"
+    - "**/.DS_Store"
+    - "**/node_modules/**"
+
+pdf:
+  strategy: "text_then_ocr"
+  ocr_page_limit: 200
+  min_text_chars_before_ocr: 200
+
+ocr:
+  enabled: true
+  provider: "gemini"
+  model: "gemini-2.0-flash"
+  timeout: 120
+  concurrency: 2
+
+embeddings:
+  provider: "openrouter"
+  model: "qwen/qwen3-embedding-8b"
+  batch_size: 64
+  concurrency: 2
+
+chunking:
+  max_chars: 1800
+  overlap: 200
+  min_chars: 150
+  semantic:
+    enabled: false
+
+enrichment:
+  enabled: true
+  provider: "openrouter"
+  model: "openai/gpt-4.1-mini"
+  max_input_chars: 20000
+  max_output_tokens: 5000
+
+search:
+  mode: "hybrid"
+  vector_top_k: 50
+  keyword_top_k: 50
+  final_top_k: 10
+  rrf_k: 60
+  recency:
+    half_life_days: 90
+    weight: 0.3
+  reranker:
+    enabled: true
+    provider: "baseten"
+    model_id: "wnppr2y3"
+    timeout: 120
+
+lancedb:
+  table: "chunks"
+
+logging:
+  level: "WARNING"
+
+server:
+  host: "0.0.0.0"
+  port: 7788
+  auth: true                   # require API_KEY env var for all requests
