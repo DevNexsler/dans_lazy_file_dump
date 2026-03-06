@@ -24,6 +24,21 @@ index_root: "{tmpdir}/index"
 """)
         config = load_config(cfg_path)
         assert config["vault_root"] == str(vault)
+        assert config["documents_root"] == str(vault)
+
+
+def test_load_documents_root_config():
+    """documents_root is accepted as an alias for vault_root."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        docs = Path(tmpdir) / "documents"
+        docs.mkdir()
+        cfg_path = _write_config(Path(tmpdir), f"""
+documents_root: "{docs}"
+index_root: "{tmpdir}/index"
+""")
+        config = load_config(cfg_path)
+        assert config["documents_root"] == str(docs)
+        assert config["vault_root"] == str(docs)
 
 
 def test_missing_file():
@@ -31,10 +46,10 @@ def test_missing_file():
         load_config("/nonexistent/config.yaml")
 
 
-def test_missing_vault_root_key():
+def test_missing_documents_root_key():
     with tempfile.TemporaryDirectory() as tmpdir:
         cfg_path = _write_config(Path(tmpdir), 'index_root: "/tmp/idx"')
-        with pytest.raises(ValueError, match="vault_root"):
+        with pytest.raises(ValueError, match="documents_root"):
             load_config(cfg_path)
 
 
@@ -47,13 +62,13 @@ def test_missing_index_root_key():
             load_config(cfg_path)
 
 
-def test_vault_root_does_not_exist():
+def test_documents_root_does_not_exist():
     with tempfile.TemporaryDirectory() as tmpdir:
         cfg_path = _write_config(Path(tmpdir), """
 vault_root: "/nonexistent/vault"
 index_root: "/tmp/idx"
 """)
-        with pytest.raises(ValueError, match="vault_root does not exist"):
+        with pytest.raises(ValueError, match="documents_root does not exist"):
             load_config(cfg_path)
 
 

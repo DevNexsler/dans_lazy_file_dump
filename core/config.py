@@ -14,7 +14,13 @@ except ImportError:
 
 
 def load_config(config_path: str | Path = "config.yaml") -> dict[str, Any]:
-    """Load YAML config. Raises if file missing or required keys absent."""
+    """Load YAML config. Raises if file missing or required keys absent.
+
+    Accepts either ``documents_root`` or ``vault_root`` for the source
+    directory.  Internally both are normalised so that either key works
+    everywhere (``config["documents_root"]`` and ``config["vault_root"]``
+    both resolve to the same path).
+    """
     path = Path(config_path)
     if not path.exists():
         raise FileNotFoundError(f"Config not found: {path}")
@@ -25,14 +31,22 @@ def load_config(config_path: str | Path = "config.yaml") -> dict[str, Any]:
     if not raw:
         raise ValueError("Config file is empty")
 
-    required = ["vault_root", "index_root"]
-    for key in required:
-        if key not in raw:
-            raise ValueError(f"Config missing required key: {key}")
+    # Accept either documents_root or vault_root (prefer documents_root)
+    docs_root = raw.get("documents_root") or raw.get("vault_root")
+    if not docs_root:
+        raise ValueError(
+            "Config missing required key: documents_root (or vault_root)"
+        )
+    # Normalise: both keys resolve to the same value
+    raw["documents_root"] = docs_root
+    raw["vault_root"] = docs_root
 
-    vault = Path(raw["vault_root"])
-    if not vault.exists():
-        raise ValueError(f"vault_root does not exist: {vault}")
+    if "index_root" not in raw:
+        raise ValueError("Config missing required key: index_root")
+
+    docs_path = Path(docs_root)
+    if not docs_path.exists():
+        raise ValueError(f"documents_root does not exist: {docs_path}")
 
     # --- Validate chunking parameters ---
     chunk_cfg = raw.get("chunking", {})

@@ -321,8 +321,8 @@ class TestGetChunk:
 class TestMCPHandlers:
     """Test MCP tool implementations with real data."""
 
-    def test_vault_search_impl(self, indexed_store):
-        """vault_search returns dict with results list, diagnostics, and expected keys."""
+    def test_file_search_impl(self, indexed_store):
+        """file_search returns dict with results list, diagnostics, and expected keys."""
         # We need to wire up the MCP module to use our test store
         import mcp_server
         mcp_server._cache = (
@@ -331,7 +331,7 @@ class TestMCPHandlers:
             indexed_store["config"],
         )
 
-        response = mcp_server._vault_search_impl("kimchi recipe", top_k=3)
+        response = mcp_server._file_search_impl("kimchi recipe", top_k=3)
         assert isinstance(response, dict)
         assert "results" in response
         assert "diagnostics" in response
@@ -348,8 +348,8 @@ class TestMCPHandlers:
         # Diagnostics should report healthy search
         assert response["diagnostics"]["degraded"] is False
 
-    def test_vault_get_chunk_impl(self, indexed_store):
-        """vault_get_chunk returns chunk text."""
+    def test_file_get_chunk_impl(self, indexed_store):
+        """file_get_chunk returns chunk text."""
         import mcp_server
         mcp_server._cache = (
             indexed_store["store"],
@@ -357,14 +357,14 @@ class TestMCPHandlers:
             indexed_store["config"],
         )
 
-        result = mcp_server._vault_get_chunk_impl("note2.md", "c:0")
+        result = mcp_server._file_get_chunk_impl("note2.md", "c:0")
         assert result is not None
         assert "doc_id" in result
         assert "text" in result
         assert "roof" in result["text"].lower() or "insurance" in result["text"].lower()
 
-    def test_vault_search_empty_query_returns_error(self, indexed_store):
-        """vault_search returns structured error for empty query."""
+    def test_file_search_empty_query_returns_error(self, indexed_store):
+        """file_search returns structured error for empty query."""
         import mcp_server
         mcp_server._cache = (
             indexed_store["store"],
@@ -372,14 +372,14 @@ class TestMCPHandlers:
             indexed_store["config"],
         )
 
-        result = mcp_server._vault_search_impl("", top_k=3)
+        result = mcp_server._file_search_impl("", top_k=3)
         assert isinstance(result, dict)
         assert result["error"] is True
         assert result["code"] == "empty_query"
         assert "fix" in result
 
-    def test_vault_search_invalid_source_type_returns_error(self, indexed_store):
-        """vault_search returns error for invalid source_type."""
+    def test_file_search_invalid_source_type_returns_error(self, indexed_store):
+        """file_search returns error for invalid source_type."""
         import mcp_server
         mcp_server._cache = (
             indexed_store["store"],
@@ -387,13 +387,13 @@ class TestMCPHandlers:
             indexed_store["config"],
         )
 
-        result = mcp_server._vault_search_impl("test", source_type="docx")
+        result = mcp_server._file_search_impl("test", source_type="docx")
         assert isinstance(result, dict)
         assert result["error"] is True
         assert result["code"] == "invalid_parameter"
 
-    def test_vault_get_chunk_not_found_returns_error(self, indexed_store):
-        """vault_get_chunk returns structured error when chunk not found."""
+    def test_file_get_chunk_not_found_returns_error(self, indexed_store):
+        """file_get_chunk returns structured error when chunk not found."""
         import mcp_server
         mcp_server._cache = (
             indexed_store["store"],
@@ -401,14 +401,14 @@ class TestMCPHandlers:
             indexed_store["config"],
         )
 
-        result = mcp_server._vault_get_chunk_impl("nonexistent.md", "c:0")
+        result = mcp_server._file_get_chunk_impl("nonexistent.md", "c:0")
         assert isinstance(result, dict)
         assert result["error"] is True
         assert result["code"] == "not_found"
         assert "fix" in result
 
-    def test_vault_get_doc_chunks_impl(self, indexed_store):
-        """vault_get_doc_chunks returns all chunks for a document."""
+    def test_file_get_doc_chunks_impl(self, indexed_store):
+        """file_get_doc_chunks returns all chunks for a document."""
         import mcp_server
         mcp_server._cache = (
             indexed_store["store"],
@@ -416,14 +416,14 @@ class TestMCPHandlers:
             indexed_store["config"],
         )
 
-        result = mcp_server._vault_get_doc_chunks_impl("note2.md")
+        result = mcp_server._file_get_doc_chunks_impl("note2.md")
         assert isinstance(result, list)
         assert len(result) >= 1
         assert "text" in result[0]
         assert "loc" in result[0]
 
-    def test_vault_get_doc_chunks_not_found_returns_error(self, indexed_store):
-        """vault_get_doc_chunks returns error for nonexistent document."""
+    def test_file_get_doc_chunks_not_found_returns_error(self, indexed_store):
+        """file_get_doc_chunks returns error for nonexistent document."""
         import mcp_server
         mcp_server._cache = (
             indexed_store["store"],
@@ -431,13 +431,13 @@ class TestMCPHandlers:
             indexed_store["config"],
         )
 
-        result = mcp_server._vault_get_doc_chunks_impl("nonexistent.md")
+        result = mcp_server._file_get_doc_chunks_impl("nonexistent.md")
         assert isinstance(result, dict)
         assert result["error"] is True
         assert result["code"] == "not_found"
 
-    def test_vault_list_documents_impl(self, indexed_store):
-        """vault_list_documents returns paginated document list."""
+    def test_file_list_documents_impl(self, indexed_store):
+        """file_list_documents returns paginated document list."""
         import mcp_server
         mcp_server._cache = (
             indexed_store["store"],
@@ -445,7 +445,7 @@ class TestMCPHandlers:
             indexed_store["config"],
         )
 
-        result = mcp_server._vault_list_documents_impl(offset=0, limit=10)
+        result = mcp_server._file_list_documents_impl(offset=0, limit=10)
         assert isinstance(result, dict)
         assert "documents" in result
         assert "total" in result
@@ -455,8 +455,8 @@ class TestMCPHandlers:
         doc = result["documents"][0]
         assert "doc_id" in doc
 
-    def test_vault_status_impl(self, indexed_store):
-        """vault_status returns doc count, chunk count, and provider info."""
+    def test_file_status_impl(self, indexed_store):
+        """file_status returns doc count, chunk count, and provider info."""
         import json
         import mcp_server
 
@@ -471,7 +471,7 @@ class TestMCPHandlers:
             indexed_store["config"],
         )
 
-        result = mcp_server._vault_status_impl()
+        result = mcp_server._file_status_impl()
         assert result["doc_count"] >= 4
         assert result["chunk_count"] is not None
         assert result["chunk_count"] > 0
@@ -837,7 +837,7 @@ class TestFullPipelineWithEnrichment:
         assert hit.enr_topics, "Search result should have enr_topics"
 
     def test_mcp_search_returns_enrichment_fields(self, pipeline_result):
-        """MCP vault_search handler should include enrichment fields in response dicts."""
+        """MCP file_search handler should include enrichment fields in response dicts."""
         import mcp_server
 
         mcp_server._cache = (
@@ -846,7 +846,7 @@ class TestFullPipelineWithEnrichment:
             pipeline_result["config"],
         )
 
-        response = mcp_server._vault_search_impl("insurance claim roof", top_k=3)
+        response = mcp_server._file_search_impl("insurance claim roof", top_k=3)
         assert "results" in response
         results = response["results"]
         assert len(results) >= 1
@@ -860,7 +860,7 @@ class TestFullPipelineWithEnrichment:
             assert field in r, f"MCP response missing enrichment field: {field}"
 
     def test_mcp_get_chunk_returns_enrichment_fields(self, pipeline_result):
-        """MCP vault_get_chunk handler should include enrichment fields."""
+        """MCP file_get_chunk handler should include enrichment fields."""
         import mcp_server
 
         mcp_server._cache = (
@@ -869,7 +869,7 @@ class TestFullPipelineWithEnrichment:
             pipeline_result["config"],
         )
 
-        result = mcp_server._vault_get_chunk_impl("note1.md", "c:0")
+        result = mcp_server._file_get_chunk_impl("note1.md", "c:0")
         assert result is not None
 
         print(f"\n    MCP get_chunk result for note1.md c:0:")

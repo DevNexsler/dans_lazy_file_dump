@@ -369,7 +369,7 @@ class LanceDBStore:
         logger.info("FTS index created/rebuilt on column %r", text_key)
 
     def fts_available(self) -> bool:
-        """Check if the FTS/tantivy index is operational (health check for vault_status)."""
+        """Check if the FTS/tantivy index is operational (health check for file_status)."""
         try:
             self._vs.table.search("test", query_type="fts").limit(1).to_list()
             return True

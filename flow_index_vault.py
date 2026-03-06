@@ -497,7 +497,7 @@ def write_index_metadata_task(
     failed_docs: list[str] | None = None,
     warnings: list[str] | None = None,
 ) -> None:
-    """Write index_metadata.json for vault_status (last_run_at, counts, failures, warnings)."""
+    """Write index_metadata.json for file_status (last_run_at, counts, failures, warnings)."""
     import json
     from datetime import datetime, timezone
     path = Path(index_root) / "index_metadata.json"
@@ -526,7 +526,7 @@ def index_vault_flow(config_path: str = "config.yaml") -> None:
     import time
     logger = get_run_logger()
     config = load_config(config_path)
-    vault_root = Path(config["vault_root"])
+    vault_root = Path(config["documents_root"])
     index_root = Path(config["index_root"])
     scan_cfg = config.get("scan", {})
     include = scan_cfg.get("include", ["**/*.md"])

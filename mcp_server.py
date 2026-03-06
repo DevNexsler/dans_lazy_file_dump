@@ -1,4 +1,4 @@
-"""MCP server: vault search, retrieval, browsing, status, and indexing tools.
+"""MCP server: file search, retrieval, browsing, status, and indexing tools.
 
 Single service: both querying and indexing via MCP tools. Same config as indexer."""
 
@@ -137,7 +137,7 @@ def _get_deps(config_path: str = "config.yaml"):
 # ---------------------------------------------------------------------------
 
 
-def _vault_search_impl(
+def _file_search_impl(
     query: str,
     top_k: int = 10,
     doc_id_prefix: str | None = None,
@@ -215,27 +215,27 @@ def _vault_search_impl(
         )
     except Exception as exc:
         return _error("search_failed", f"Search operation failed: {exc}",
-                       "Check that the index exists (run vault_index_update) and configured services are running.")
+                       "Check that the index exists (run file_index_update) and configured services are running.")
     return {
         "results": [_hit_to_dict(h) for h in result.hits],
         "diagnostics": result.diagnostics,
     }
 
 
-def _vault_get_chunk_impl(doc_id: str, loc: str) -> dict:
+def _file_get_chunk_impl(doc_id: str, loc: str) -> dict:
     if not doc_id or not doc_id.strip():
         return _error(
             "invalid_parameter",
             "doc_id must not be empty.",
-            "Provide the vault-relative file path (e.g., 'Projects/recipe.md'). "
-            "Use vault_search or vault_list_documents to find valid doc_ids.",
+            "Provide the document-relative file path (e.g., 'Projects/recipe.md'). "
+            "Use file_search or file_list_documents to find valid doc_ids.",
         )
     if not loc or not loc.strip():
         return _error(
             "invalid_parameter",
             "loc must not be empty.",
             "Provide the chunk locator (e.g., 'c:0' or 'p:3:c:1'). "
-            "Use vault_search to find valid doc_id + loc pairs.",
+            "Use file_search to find valid doc_id + loc pairs.",
         )
 
     try:
@@ -248,7 +248,7 @@ def _vault_get_chunk_impl(doc_id: str, loc: str) -> dict:
         hit = store.get_chunk(doc_id, loc)
     except Exception as exc:
         return _error("retrieval_failed", f"Failed to retrieve chunk: {exc}",
-                       "Check that the index exists (run vault_index_update).")
+                       "Check that the index exists (run file_index_update).")
     if hit is not None:
         return _hit_to_dict(hit, include_text=True)
 
@@ -257,34 +257,34 @@ def _vault_get_chunk_impl(doc_id: str, loc: str) -> dict:
         doc_ids = store.list_doc_ids()
     except Exception as exc:
         return _error("retrieval_failed", f"Failed to list documents: {exc}",
-                       "Check that the index exists (run vault_index_update).")
+                       "Check that the index exists (run file_index_update).")
     if not doc_ids:
         return _error(
             "index_empty",
             "No documents indexed yet.",
-            "Run vault_index_update to index your vault first.",
+            "Run file_index_update to index your documents first.",
         )
     if doc_id not in doc_ids:
         return _error(
             "not_found",
             f"Document '{doc_id}' not found in the index.",
-            "Use vault_search or vault_list_documents to find valid doc_ids.",
+            "Use file_search or file_list_documents to find valid doc_ids.",
         )
     return _error(
         "not_found",
         f"Chunk loc '{loc}' not found in document '{doc_id}'.",
-        "Use vault_search to find valid loc values, or vault_get_doc_chunks "
+        "Use file_search to find valid loc values, or file_get_doc_chunks "
         f"to see all chunks for this document.",
     )
 
 
-def _vault_get_doc_chunks_impl(doc_id: str) -> list[dict] | dict:
+def _file_get_doc_chunks_impl(doc_id: str) -> list[dict] | dict:
     if not doc_id or not doc_id.strip():
         return _error(
             "invalid_parameter",
             "doc_id must not be empty.",
-            "Provide the vault-relative file path (e.g., 'Projects/recipe.md'). "
-            "Use vault_search or vault_list_documents to find valid doc_ids.",
+            "Provide the document-relative file path (e.g., 'Projects/recipe.md'). "
+            "Use file_search or file_list_documents to find valid doc_ids.",
         )
 
     try:
@@ -297,7 +297,7 @@ def _vault_get_doc_chunks_impl(doc_id: str) -> list[dict] | dict:
         chunks = store.get_doc_chunks(doc_id)
     except Exception as exc:
         return _error("retrieval_failed", f"Failed to retrieve chunks: {exc}",
-                       "Check that the index exists (run vault_index_update).")
+                       "Check that the index exists (run file_index_update).")
     if chunks:
         return [_hit_to_dict(h, include_text=True) for h in chunks]
 
@@ -305,21 +305,21 @@ def _vault_get_doc_chunks_impl(doc_id: str) -> list[dict] | dict:
         doc_ids = store.list_doc_ids()
     except Exception as exc:
         return _error("retrieval_failed", f"Failed to list documents: {exc}",
-                       "Check that the index exists (run vault_index_update).")
+                       "Check that the index exists (run file_index_update).")
     if not doc_ids:
         return _error(
             "index_empty",
             "No documents indexed yet.",
-            "Run vault_index_update to index your vault first.",
+            "Run file_index_update to index your documents first.",
         )
     return _error(
         "not_found",
         f"Document '{doc_id}' not found in the index.",
-        "Use vault_search or vault_list_documents to find valid doc_ids.",
+        "Use file_search or file_list_documents to find valid doc_ids.",
     )
 
 
-def _vault_list_documents_impl(
+def _file_list_documents_impl(
     offset: int = 0,
     limit: int = 50,
     source_type: str | None = None,
@@ -341,7 +341,7 @@ def _vault_list_documents_impl(
         all_docs = store.list_recent_docs(limit=100_000, source_type=source_type, folder=folder)
     except Exception as exc:
         return _error("retrieval_failed", f"Failed to list documents: {exc}",
-                       "Check that the index exists (run vault_index_update).")
+                       "Check that the index exists (run file_index_update).")
     total = len(all_docs)
     page = all_docs[offset : offset + limit]
     _enrich_doc_list(page)
@@ -349,7 +349,7 @@ def _vault_list_documents_impl(
     return {"documents": page, "total": total, "offset": offset, "limit": limit}
 
 
-def _vault_status_impl() -> dict:
+def _file_status_impl() -> dict:
     try:
         store, _, config = _get_deps()
     except Exception as exc:
@@ -361,7 +361,7 @@ def _vault_status_impl() -> dict:
         chunk_count = store.count_chunks()
     except Exception as exc:
         return _error("retrieval_failed", f"Failed to read index status: {exc}",
-                       "Check that the index exists (run vault_index_update).")
+                       "Check that the index exists (run file_index_update).")
 
     import json
     index_root = Path(config["index_root"])
@@ -423,7 +423,7 @@ def _vault_status_impl() -> dict:
     }
 
 
-def _vault_recent_impl(
+def _file_recent_impl(
     limit: int = 20,
     source_type: str | None = None,
     folder: str | None = None,
@@ -442,12 +442,12 @@ def _vault_recent_impl(
         docs = store.list_recent_docs(limit=limit, source_type=source_type, folder=folder)
     except Exception as exc:
         return _error("retrieval_failed", f"Failed to list recent documents: {exc}",
-                       "Check that the index exists (run vault_index_update).")
+                       "Check that the index exists (run file_index_update).")
     _enrich_doc_list(docs)
     return docs
 
 
-def _vault_facets_impl() -> dict:
+def _file_facets_impl() -> dict:
     try:
         store, _, _ = _get_deps()
     except Exception as exc:
@@ -457,22 +457,22 @@ def _vault_facets_impl() -> dict:
         return store.facets()
     except Exception as exc:
         return _error("retrieval_failed", f"Failed to retrieve facets: {exc}",
-                       "Check that the index exists (run vault_index_update).")
+                       "Check that the index exists (run file_index_update).")
 
 
-def _vault_folders_impl() -> dict:
-    """Scan the vault directory and return folder tree with file counts."""
+def _file_folders_impl() -> dict:
+    """Scan the documents directory and return folder tree with file counts."""
     import os
     from collections import Counter
     from flow_index_vault import _matches_any
 
     config = load_config()
-    vault_root = Path(config["vault_root"])
-    if not vault_root.exists():
+    docs_root = Path(config["documents_root"])
+    if not docs_root.exists():
         return _error(
             "not_found",
-            f"Vault root directory not found: {vault_root}",
-            "Check vault_root in config.yaml.",
+            f"Documents root directory not found: {docs_root}",
+            "Check documents_root (or vault_root) in config.yaml.",
         )
 
     scan_cfg = config.get("scan", {})
@@ -482,20 +482,20 @@ def _vault_folders_impl() -> dict:
     folder_counts: Counter = Counter()
     total_files = 0
     visited: set[str] = set()
-    for dirpath, _dirnames, filenames in os.walk(vault_root, followlinks=True):
+    for dirpath, _dirnames, filenames in os.walk(docs_root, followlinks=True):
         real = os.path.realpath(dirpath)
         if real in visited:
             continue
         visited.add(real)
         for fname in filenames:
             full_path = Path(dirpath) / fname
-            rel_str = str(full_path.relative_to(vault_root)).replace("\\", "/")
+            rel_str = str(full_path.relative_to(docs_root)).replace("\\", "/")
             if _matches_any(rel_str, exclude):
                 continue
             if not _matches_any(rel_str, include):
                 continue
             total_files += 1
-            rel_dir = str(Path(dirpath).relative_to(vault_root)).replace("\\", "/")
+            rel_dir = str(Path(dirpath).relative_to(docs_root)).replace("\\", "/")
             if rel_dir == ".":
                 rel_dir = "."
             folder_counts[rel_dir] += 1
@@ -505,28 +505,28 @@ def _vault_folders_impl() -> dict:
         key=lambda x: x["path"],
     )
     return {
-        "vault_root": str(vault_root),
+        "documents_root": str(docs_root),
         "folders": folders,
         "total_folders": len(folders),
         "total_files": total_files,
     }
 
 
-def _vault_index_update_impl(config_path: str = "config.yaml") -> dict:
+def _file_index_update_impl(config_path: str = "config.yaml") -> dict:
     from flow_index_vault import index_vault_flow
 
     t0 = time.perf_counter()
-    logger.info("vault_index_update: starting indexer flow")
+    logger.info("file_index_update: starting indexer flow")
     try:
         index_vault_flow(config_path)
     except Exception as exc:
         elapsed = time.perf_counter() - t0
-        logger.error("vault_index_update failed after %.1fs: %s", elapsed, exc)
+        logger.error("file_index_update failed after %.1fs: %s", elapsed, exc)
         return _error(
             "index_failed",
             f"Index update failed after {elapsed:.1f}s: {exc}",
             "Common causes: cloud API keys not set, configured services unreachable, "
-            "vault_root path incorrect in config.yaml, or disk full. Check logs for details.",
+            "documents_root path incorrect in config.yaml, or disk full. Check logs for details.",
         )
     elapsed = time.perf_counter() - t0
 
@@ -554,7 +554,7 @@ def _vault_index_update_impl(config_path: str = "config.yaml") -> dict:
                 result["failed_docs"] = meta.get("failed_docs", [])
         except Exception as exc:
             logger.warning("Failed to read index_metadata.json after indexing: %s", exc)
-    logger.info("vault_index_update: completed in %.1fs", elapsed)
+    logger.info("file_index_update: completed in %.1fs", elapsed)
     return result
 
 
@@ -563,10 +563,10 @@ def _vault_index_update_impl(config_path: str = "config.yaml") -> dict:
 # ---------------------------------------------------------------------------
 
 if HAS_MCP and FastMCP is not None:
-    mcp = FastMCP("vault-index-mcp", json_response=True)
+    mcp = FastMCP("file-index-mcp", json_response=True)
 
     @mcp.tool()
-    def vault_search(
+    def file_search(
         query: str,
         top_k: int = 10,
         doc_id_prefix: str | None = None,
@@ -579,7 +579,7 @@ if HAS_MCP and FastMCP is not None:
         enr_doc_type: str | None = None,
         enr_topics: str | None = None,
     ) -> dict:
-        """Hybrid semantic + keyword search over the indexed vault.
+        """Hybrid semantic + keyword search over the indexed documents.
 
         Combines vector similarity search with BM25 keyword search using
         Reciprocal Rank Fusion (RRF), with optional cross-encoder re-ranking.
@@ -599,18 +599,18 @@ if HAS_MCP and FastMCP is not None:
                 Uses time-decay scoring (not a strict sort by date).
             metadata_filters: JSON string of {field: value} pairs for filtering on
                 any metadata field, including dynamic fields added by the indexer.
-                Example: '{"section": "Introduction"}'. Use vault_facets or
-                vault_status to discover available fields. Combined with AND logic.
+                Example: '{"section": "Introduction"}'. Use file_facets or
+                file_status to discover available fields. Combined with AND logic.
             enr_doc_type: Filter by LLM-enriched document type (e.g.,
                 "Geotechnical Report", "Recipe"). Comma-separated for OR logic.
-                Values come from vault_facets doc_types. Uses LIKE matching.
+                Values come from file_facets doc_types. Uses LIKE matching.
             enr_topics: Filter by LLM-enriched topic (e.g., "machine learning",
                 "Korean cooking"). Comma-separated for OR logic. Values come
-                from vault_facets topics. Uses LIKE matching.
+                from file_facets topics. Uses LIKE matching.
 
         Returns a dict with:
             - results: List of result dicts, each containing:
-                - doc_id: Vault-relative file path (e.g., "Projects/recipe.md").
+                - doc_id: Document-relative file path (e.g., "Projects/recipe.md").
                 - loc: Chunk locator within the document (e.g., "c:0" for first chunk,
                   "p:3:c:1" for page 3 chunk 1 of a PDF).
                 - snippet: First ~200 characters of the chunk text (preview).
@@ -635,49 +635,49 @@ if HAS_MCP and FastMCP is not None:
         Filters are combined with AND logic (e.g., source_type="md" AND folder="Projects").
         Only the tags filter uses OR logic within its values.
 
-        To get the full text of a result, call vault_get_chunk with the doc_id and loc.
-        To see all available filter values, call vault_facets first.
+        To get the full text of a result, call file_get_chunk with the doc_id and loc.
+        To see all available filter values, call file_facets first.
 
         On error, returns {"error": true, "code": "...", "message": "...", "fix": "..."}.
         """
-        return _vault_search_impl(
+        return _file_search_impl(
             query, top_k, doc_id_prefix, source_type, tags, status, folder,
             prefer_recent, metadata_filters, enr_doc_type, enr_topics,
         )
 
     @mcp.tool()
-    def vault_get_chunk(doc_id: str, loc: str) -> dict:
+    def file_get_chunk(doc_id: str, loc: str) -> dict:
         """Retrieve the full text and metadata for a single chunk.
 
-        Use this after vault_search to get the complete text of a result.
+        Use this after file_search to get the complete text of a result.
 
         Args:
-            doc_id: Vault-relative file path, exactly as returned by vault_search
+            doc_id: Document-relative file path, exactly as returned by file_search
                 (e.g., "Projects/recipe.md" or "Archive/2024/report.pdf").
-            loc: Chunk locator, exactly as returned by vault_search
+            loc: Chunk locator, exactly as returned by file_search
                 (e.g., "c:0" for chunk 0, "p:3:c:1" for page 3 chunk 1).
 
-        Returns a dict with all fields from vault_search, plus:
+        Returns a dict with all fields from file_search, plus:
             - text: Full chunk text (including contextual header with doc metadata).
 
         On error, returns {"error": true, "code": "...", "message": "...", "fix": "..."}.
         Common errors:
-            - not_found: The doc_id or loc does not exist. Use vault_search to
+            - not_found: The doc_id or loc does not exist. Use file_search to
               find valid doc_id + loc pairs.
-            - index_empty: No documents indexed. Run vault_index_update first.
+            - index_empty: No documents indexed. Run file_index_update first.
         """
-        return _vault_get_chunk_impl(doc_id, loc)
+        return _file_get_chunk_impl(doc_id, loc)
 
     @mcp.tool()
-    def vault_get_doc_chunks(doc_id: str) -> list[dict] | dict:
+    def file_get_doc_chunks(doc_id: str) -> list[dict] | dict:
         """Retrieve all chunks for a document, sorted by position.
 
         Returns every chunk of the given document with full text. Useful for
         reading an entire document or understanding its structure.
 
         Args:
-            doc_id: Vault-relative file path (e.g., "Projects/recipe.md").
-                Use vault_search or vault_list_documents to find valid doc_ids.
+            doc_id: Document-relative file path (e.g., "Projects/recipe.md").
+                Use file_search or file_list_documents to find valid doc_ids.
 
         Returns a list of chunk dicts, each containing:
             - loc: Chunk position (e.g., "c:0", "c:1", "p:2:c:0"). Sorted
@@ -687,10 +687,10 @@ if HAS_MCP and FastMCP is not None:
 
         On error, returns {"error": true, "code": "...", "message": "...", "fix": "..."}.
         """
-        return _vault_get_doc_chunks_impl(doc_id)
+        return _file_get_doc_chunks_impl(doc_id)
 
     @mcp.tool()
-    def vault_list_documents(
+    def file_list_documents(
         offset: int = 0,
         limit: int = 50,
         source_type: str | None = None,
@@ -719,10 +719,10 @@ if HAS_MCP and FastMCP is not None:
         Use total and offset to paginate: next page is offset + limit.
         On error, returns {"error": true, "code": "...", "message": "...", "fix": "..."}.
         """
-        return _vault_list_documents_impl(offset, limit, source_type, folder)
+        return _file_list_documents_impl(offset, limit, source_type, folder)
 
     @mcp.tool()
-    def vault_recent(
+    def file_recent(
         limit: int = 20,
         source_type: str | None = None,
         folder: str | None = None,
@@ -738,7 +738,7 @@ if HAS_MCP and FastMCP is not None:
             folder: Filter by top-level folder name (e.g., "Projects").
 
         Returns a list of document metadata dicts, each containing:
-            - doc_id: Vault-relative path (e.g., "Archive/notes.md").
+            - doc_id: Document-relative path (e.g., "Archive/notes.md").
             - title, source_type, folder, tags (array), status, created.
             - mtime: Unix timestamp of last modification.
             - mtime_iso: ISO 8601 UTC string (e.g., "2026-02-20T15:30:00+00:00").
@@ -746,10 +746,10 @@ if HAS_MCP and FastMCP is not None:
 
         On error, returns {"error": true, "code": "...", "message": "...", "fix": "..."}.
         """
-        return _vault_recent_impl(limit, source_type, folder)
+        return _file_recent_impl(limit, source_type, folder)
 
     @mcp.tool()
-    def vault_facets() -> dict:
+    def file_facets() -> dict:
         """Discover all available filter values, tags, topics, and document counts.
 
         Call this before searching to see what tags, folders, topics, keywords,
@@ -773,36 +773,36 @@ if HAS_MCP and FastMCP is not None:
             - entities_places: [{value: "Seoul", count: 5}, ...] (from enr_entities_places).
             - entities_orgs: [{value: "OpenAI", count: 4}, ...] (from enr_entities_orgs).
 
-        Use these values as filter parameters in vault_search, vault_recent,
-        and vault_list_documents. Use vault_folders to browse the directory tree.
+        Use these values as filter parameters in file_search, file_recent,
+        and file_list_documents. Use file_folders to browse the directory tree.
         """
-        return _vault_facets_impl()
+        return _file_facets_impl()
 
     @mcp.tool()
-    def vault_folders() -> dict:
-        """Browse the vault's folder/directory structure with file counts.
+    def file_folders() -> dict:
+        """Browse the documents folder/directory structure with file counts.
 
-        Scans the actual vault filesystem (not the index) and returns every
+        Scans the actual documents filesystem (not the index) and returns every
         folder that contains supported files, with a count of files per folder.
         Shows the full nested hierarchy, including folders with unindexed files.
 
         Takes no arguments.
 
         Returns a dict with:
-            - vault_root: Absolute path to the vault root directory.
+            - documents_root: Absolute path to the documents root directory.
             - folders: List of {path, file_count} sorted alphabetically.
-              "path" is relative to vault_root (e.g., "Projects/DocOrganizer").
+              "path" is relative to documents_root (e.g., "Projects/DocOrganizer").
               Root-level files show as path ".".
             - total_folders: Number of folders containing files.
             - total_files: Total supported files across all folders.
 
-        Use folder paths with vault_search (doc_id_prefix) or vault_list_documents
+        Use folder paths with file_search (doc_id_prefix) or file_list_documents
         (folder) to narrow results to a specific directory.
         """
-        return _vault_folders_impl()
+        return _file_folders_impl()
 
     @mcp.tool()
-    def vault_status() -> dict:
+    def file_status() -> dict:
         """Return index health information and configuration.
 
         Takes no arguments.
@@ -810,12 +810,12 @@ if HAS_MCP and FastMCP is not None:
         Returns a dict with:
             - doc_count: Number of distinct documents (files) in the index.
             - chunk_count: Total text chunks across all documents.
-            - last_run_at: ISO 8601 timestamp of the last vault_index_update run
+            - last_run_at: ISO 8601 timestamp of the last file_index_update run
               (null if never indexed).
             - embeddings_provider: Configured embedding backend (e.g., "openrouter").
             - metadata_fields: List of all metadata field names in the index schema
               (e.g., ["doc_id", "folder", "section", "source_type", ...]). Use these
-              field names with vault_search's metadata_filters parameter.
+              field names with file_search's metadata_filters parameter.
             - health: Service health diagnostics:
                 - fts_available: true if the full-text search (BM25/tantivy) index
                   is operational. False means keyword search is down.
@@ -826,28 +826,28 @@ if HAS_MCP and FastMCP is not None:
                   the last indexing run (0 = clean).
 
         Troubleshooting:
-            - If doc_count is 0, run vault_index_update to index your vault.
+            - If doc_count is 0, run file_index_update to index your documents.
             - If last_run_at is null, the index has never been built.
-            - If health.fts_available is false, run vault_index_update to rebuild
+            - If health.fts_available is false, run file_index_update to rebuild
               the FTS index.
             - If health.reranker_responsive is false, check configured reranker
               service is running (Baseten deployment active, or llama-server started).
         """
-        return _vault_status_impl()
+        return _file_status_impl()
 
     @mcp.tool()
-    def vault_index_update() -> dict:
-        """Incrementally update the vault index based on file changes.
+    def file_index_update() -> dict:
+        """Incrementally update the index based on file changes.
 
-        Scans the vault, diffs against the current index, and only processes
+        Scans the documents directory, diffs against the current index, and only processes
         new, modified, or deleted files. Does NOT rebuild from scratch — existing
         unchanged documents keep their current index entries.
 
         WARNING: This is a blocking operation that may take several minutes for
-        large vaults with many changes.
+        large document sets with many changes.
 
         Takes no arguments. Pipeline steps:
-            1. Scans the vault directory for all supported files.
+            1. Scans the documents directory for all supported files.
             2. Diffs against the current index (by file modification time) to find
                new, modified, and deleted files.
             3. Extracts text from new/modified files only (Markdown, PDF, images via OCR).
@@ -866,7 +866,7 @@ if HAS_MCP and FastMCP is not None:
         On error, returns {"error": true, "code": "index_failed", "message": "...",
         "fix": "..."} with guidance (e.g., check configured services are running, verify config paths).
         """
-        return _vault_index_update_impl()
+        return _file_index_update_impl()
 
     def run_server(transport: str = "stdio", host: str = "127.0.0.1", port: int = 7788):
         """Run the MCP server.
@@ -883,7 +883,7 @@ if HAS_MCP and FastMCP is not None:
 else:
     def run_server(transport: str = "stdio", host: str = "127.0.0.1", port: int = 7788):
         print("Install mcp to run the server: pip install mcp")
-        print("Tool implementations available: _vault_search_impl, _vault_get_chunk_impl, _vault_status_impl")
+        print("Tool implementations available: _file_search_impl, _file_get_chunk_impl, _file_status_impl")
 
 
 if __name__ == "__main__":

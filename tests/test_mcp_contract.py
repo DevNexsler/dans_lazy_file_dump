@@ -129,7 +129,7 @@ def test_hit_to_dict_with_text():
 
 def test_search_error_empty_query():
     """Empty query returns structured error with expected keys."""
-    result = mcp_server._vault_search_impl("")
+    result = mcp_server._file_search_impl("")
     assert isinstance(result, dict)
     assert result["error"] is True
     assert "code" in result
@@ -142,7 +142,7 @@ def test_search_error_empty_query():
 
 def test_search_error_invalid_source_type():
     """Invalid source_type returns structured error."""
-    result = mcp_server._vault_search_impl("test query", source_type="docx")
+    result = mcp_server._file_search_impl("test query", source_type="docx")
     assert isinstance(result, dict)
     assert result["error"] is True
     assert result["code"] == "invalid_parameter"
@@ -155,7 +155,7 @@ def test_search_error_invalid_source_type():
 
 
 def test_get_deps_failure_returns_structured_error():
-    """When _build_store_and_embed raises, _vault_search_impl returns structured error."""
+    """When _build_store_and_embed raises, _file_search_impl returns structured error."""
     old_cache = mcp_server._cache
     mcp_server._cache = None
     try:
@@ -163,7 +163,7 @@ def test_get_deps_failure_returns_structured_error():
             mcp_server, "_build_store_and_embed",
             side_effect=RuntimeError("Service connection refused"),
         ):
-            result = mcp_server._vault_search_impl("test query")
+            result = mcp_server._file_search_impl("test query")
         assert isinstance(result, dict)
         assert result["error"] is True
         assert result["code"] == "service_unavailable"
@@ -174,7 +174,7 @@ def test_get_deps_failure_returns_structured_error():
 
 
 def test_get_deps_failure_in_list_documents():
-    """_vault_list_documents_impl returns structured error when deps fail."""
+    """_file_list_documents_impl returns structured error when deps fail."""
     old_cache = mcp_server._cache
     mcp_server._cache = None
     try:
@@ -182,7 +182,7 @@ def test_get_deps_failure_in_list_documents():
             mcp_server, "_build_store_and_embed",
             side_effect=RuntimeError("bad config"),
         ):
-            result = mcp_server._vault_list_documents_impl()
+            result = mcp_server._file_list_documents_impl()
         assert isinstance(result, dict)
         assert result["error"] is True
         assert result["code"] == "service_unavailable"
@@ -191,7 +191,7 @@ def test_get_deps_failure_in_list_documents():
 
 
 def test_get_deps_failure_in_recent():
-    """_vault_recent_impl returns structured error when deps fail."""
+    """_file_recent_impl returns structured error when deps fail."""
     old_cache = mcp_server._cache
     mcp_server._cache = None
     try:
@@ -199,7 +199,7 @@ def test_get_deps_failure_in_recent():
             mcp_server, "_build_store_and_embed",
             side_effect=RuntimeError("bad config"),
         ):
-            result = mcp_server._vault_recent_impl()
+            result = mcp_server._file_recent_impl()
         assert isinstance(result, dict)
         assert result["error"] is True
         assert result["code"] == "service_unavailable"
@@ -208,7 +208,7 @@ def test_get_deps_failure_in_recent():
 
 
 def test_get_deps_failure_in_facets():
-    """_vault_facets_impl returns structured error when deps fail."""
+    """_file_facets_impl returns structured error when deps fail."""
     old_cache = mcp_server._cache
     mcp_server._cache = None
     try:
@@ -216,7 +216,7 @@ def test_get_deps_failure_in_facets():
             mcp_server, "_build_store_and_embed",
             side_effect=RuntimeError("Config not found"),
         ):
-            result = mcp_server._vault_facets_impl()
+            result = mcp_server._file_facets_impl()
         assert isinstance(result, dict)
         assert result["error"] is True
         assert result["code"] == "service_unavailable"
@@ -225,7 +225,7 @@ def test_get_deps_failure_in_facets():
 
 
 def test_get_deps_failure_in_status():
-    """_vault_status_impl returns structured error when deps fail."""
+    """_file_status_impl returns structured error when deps fail."""
     old_cache = mcp_server._cache
     mcp_server._cache = None
     try:
@@ -233,7 +233,7 @@ def test_get_deps_failure_in_status():
             mcp_server, "_build_store_and_embed",
             side_effect=RuntimeError("bad config"),
         ):
-            result = mcp_server._vault_status_impl()
+            result = mcp_server._file_status_impl()
         assert isinstance(result, dict)
         assert result["error"] is True
         assert result["code"] == "service_unavailable"
@@ -292,7 +292,7 @@ def test_enrich_doc_list_empty_list():
 
 
 def test_get_deps_failure_in_get_chunk():
-    """_vault_get_chunk_impl returns structured error when deps fail."""
+    """_file_get_chunk_impl returns structured error when deps fail."""
     old_cache = mcp_server._cache
     mcp_server._cache = None
     try:
@@ -300,7 +300,7 @@ def test_get_deps_failure_in_get_chunk():
             mcp_server, "_build_store_and_embed",
             side_effect=RuntimeError("bad config"),
         ):
-            result = mcp_server._vault_get_chunk_impl("x.md", "c:0")
+            result = mcp_server._file_get_chunk_impl("x.md", "c:0")
         assert isinstance(result, dict)
         assert result["error"] is True
         assert result["code"] == "service_unavailable"
@@ -309,7 +309,7 @@ def test_get_deps_failure_in_get_chunk():
 
 
 def test_get_deps_failure_in_get_doc_chunks():
-    """_vault_get_doc_chunks_impl returns structured error when deps fail."""
+    """_file_get_doc_chunks_impl returns structured error when deps fail."""
     old_cache = mcp_server._cache
     mcp_server._cache = None
     try:
@@ -317,7 +317,7 @@ def test_get_deps_failure_in_get_doc_chunks():
             mcp_server, "_build_store_and_embed",
             side_effect=RuntimeError("bad config"),
         ):
-            result = mcp_server._vault_get_doc_chunks_impl("x.md")
+            result = mcp_server._file_get_doc_chunks_impl("x.md")
         assert isinstance(result, dict)
         assert result["error"] is True
         assert result["code"] == "service_unavailable"
@@ -357,7 +357,7 @@ def test_index_update_surfaces_failed_docs():
             with patch("flow_index_vault.index_vault_flow"):
                 with patch("mcp_server.load_config", return_value={"index_root": tmpdir}):
                     mcp_server._cache = None
-                    result = mcp_server._vault_index_update_impl(config_path="config.yaml")
+                    result = mcp_server._file_index_update_impl(config_path="config.yaml")
 
             assert result["status"] == "completed_with_errors"
             assert result["failed_count"] == 2
@@ -388,7 +388,7 @@ def test_index_update_no_failures():
             with patch("flow_index_vault.index_vault_flow"):
                 with patch("mcp_server.load_config", return_value={"index_root": tmpdir}):
                     mcp_server._cache = None
-                    result = mcp_server._vault_index_update_impl(config_path="config.yaml")
+                    result = mcp_server._file_index_update_impl(config_path="config.yaml")
 
             assert result["status"] == "completed"
             assert "failed_count" not in result
@@ -402,7 +402,7 @@ def test_index_update_no_failures():
 
 
 def test_search_response_includes_diagnostics():
-    """vault_search response should include diagnostics dict alongside results."""
+    """file_search response should include diagnostics dict alongside results."""
     from unittest.mock import MagicMock
     from search_hybrid import SearchResult
 
@@ -429,7 +429,7 @@ def test_search_response_includes_diagnostics():
 
         with patch("mcp_server.hybrid_search", return_value=mock_result):
             with patch("mcp_server.build_reranker", return_value=None):
-                result = mcp_server._vault_search_impl("test query")
+                result = mcp_server._file_search_impl("test query")
 
         assert isinstance(result, dict)
         # Success response must have results+diagnostics but NOT error
@@ -474,7 +474,7 @@ def test_search_response_degraded_flag():
 
         with patch("mcp_server.hybrid_search", return_value=mock_result):
             with patch("mcp_server.build_reranker", return_value=None):
-                result = mcp_server._vault_search_impl("test query")
+                result = mcp_server._file_search_impl("test query")
 
         assert result["diagnostics"]["degraded"] is True
         assert result["diagnostics"]["keyword_search_active"] is False
@@ -483,12 +483,12 @@ def test_search_response_degraded_flag():
 
 
 # ---------------------------------------------------------------------------
-# vault_status health fields
+# file_status health fields
 # ---------------------------------------------------------------------------
 
 
-def test_vault_status_includes_health():
-    """vault_status should include a health section with fts, reranker, and failure info."""
+def test_file_status_includes_health():
+    """file_status should include a health section with fts, reranker, and failure info."""
     import json
     import tempfile
     from unittest.mock import MagicMock
@@ -531,7 +531,7 @@ def test_vault_status_includes_health():
             # Mock reranker health check to return 200 (Baseten uses httpx.get)
             import httpx
             with patch.object(httpx, "get", return_value=MagicMock(status_code=200)):
-                result = mcp_server._vault_status_impl()
+                result = mcp_server._file_status_impl()
 
             assert "health" in result
             health = result["health"]
@@ -549,7 +549,7 @@ def test_vault_status_includes_health():
 
 
 def test_search_passes_enr_doc_type():
-    """_vault_search_impl should pass enr_doc_type through to hybrid_search."""
+    """_file_search_impl should pass enr_doc_type through to hybrid_search."""
     from unittest.mock import MagicMock, call
     from search_hybrid import SearchResult
 
@@ -567,7 +567,7 @@ def test_search_passes_enr_doc_type():
 
         with patch("mcp_server.hybrid_search", return_value=mock_result) as mock_hs:
             with patch("mcp_server.build_reranker", return_value=None):
-                mcp_server._vault_search_impl(
+                mcp_server._file_search_impl(
                     "test query", enr_doc_type="Geotechnical Report",
                 )
         _, kwargs = mock_hs.call_args
@@ -577,7 +577,7 @@ def test_search_passes_enr_doc_type():
 
 
 def test_search_passes_enr_topics():
-    """_vault_search_impl should pass enr_topics through to hybrid_search."""
+    """_file_search_impl should pass enr_topics through to hybrid_search."""
     from unittest.mock import MagicMock
     from search_hybrid import SearchResult
 
@@ -595,7 +595,7 @@ def test_search_passes_enr_topics():
 
         with patch("mcp_server.hybrid_search", return_value=mock_result) as mock_hs:
             with patch("mcp_server.build_reranker", return_value=None):
-                mcp_server._vault_search_impl(
+                mcp_server._file_search_impl(
                     "test query", enr_topics="machine learning,NLP",
                 )
         _, kwargs = mock_hs.call_args
@@ -623,7 +623,7 @@ def test_search_enr_params_default_none():
 
         with patch("mcp_server.hybrid_search", return_value=mock_result) as mock_hs:
             with patch("mcp_server.build_reranker", return_value=None):
-                mcp_server._vault_search_impl("test query")
+                mcp_server._file_search_impl("test query")
         _, kwargs = mock_hs.call_args
         assert kwargs["enr_doc_type"] is None
         assert kwargs["enr_topics"] is None
@@ -631,7 +631,7 @@ def test_search_enr_params_default_none():
         mcp_server._cache = old_cache
 
 
-def test_vault_status_health_reranker_disabled():
+def test_file_status_health_reranker_disabled():
     """When reranker is disabled, reranker_responsive should be None."""
     import json
     import tempfile
@@ -663,7 +663,7 @@ def test_vault_status_health_reranker_disabled():
             }
             mcp_server._cache = (mock_store, MagicMock(), mock_config)
 
-            result = mcp_server._vault_status_impl()
+            result = mcp_server._file_status_impl()
 
             health = result["health"]
             assert health["fts_available"] is False

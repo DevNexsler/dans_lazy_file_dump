@@ -182,4 +182,4 @@ class TestLanceDBHealth:
             config.get("lancedb", {}).get("table", "chunks"),
         )
         if not store.fts_available():
-            pytest.skip("FTS index not available — run vault_index_update to rebuild")
+            pytest.skip("FTS index not available — run file_index_update to rebuild")

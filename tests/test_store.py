@@ -505,8 +505,8 @@ def test_custom_frontmatter_promoted_to_columns():
         assert high_pri[0].doc_id == "a.md"
 
 
-def test_vault_status_returns_metadata_fields():
-    """vault_status should include metadata_fields listing all schema fields."""
+def test_file_status_returns_metadata_fields():
+    """file_status should include metadata_fields listing all schema fields."""
     with tempfile.TemporaryDirectory() as tmpdir:
         store = LanceDBStore(tmpdir, "test_chunks")
         vec = [0.0] * 768
@@ -519,7 +519,7 @@ def test_vault_status_returns_metadata_fields():
         # Wire up the test store
         mcp_server._cache = (store, None, {"index_root": tmpdir})
 
-        result = mcp_server._vault_status_impl()
+        result = mcp_server._file_status_impl()
         assert "metadata_fields" in result
         assert "section" in result["metadata_fields"]
         assert "doc_id" in result["metadata_fields"]
