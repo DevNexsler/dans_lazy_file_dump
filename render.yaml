@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: doc-organizer
+    runtime: docker
+    plan: starter
+    healthCheckPath: /mcp
+    envVars:
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: BASETEN_API_KEY
+        sync: false
+      - key: API_KEY
+        generateValue: true
+      - key: DOCUMENTS_ROOT
+        value: /data/documents
+      - key: INDEX_ROOT
+        value: /data/index
+      - key: PORT
+        value: "7788"
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 10

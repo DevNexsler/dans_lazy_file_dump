@@ -4,9 +4,24 @@
 #
 # This config is designed for Render.com, Fly.io, Railway, or any VPS.
 # Persistent storage must be mounted at /data (or override below).
+#
+# Env var overrides (take precedence over values below):
+#   DOCUMENTS_ROOT  — override documents_root
+#   INDEX_ROOT      — override index_root
+#   PORT            — override mcp.port
+#   API_KEY         — Bearer token for HTTP auth (unset = no auth)
 
 documents_root: "/data/documents"
 index_root: "/data/index"
+
+# To use S3-backed LanceDB (multi-instance scaling):
+# index_root: "s3://my-bucket/doc-organizer-index"
+# storage_options:
+#   aws_access_key_id: "${AWS_ACCESS_KEY_ID}"
+#   aws_secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
+#   region: "us-east-1"
+# lancedb:
+#   read_consistency_interval_seconds: 5
 
 scan:
   include:
@@ -71,9 +86,8 @@ lancedb:
   table: "chunks"
 
 logging:
-  level: "WARNING"
+  level: "INFO"
 
-server:
+mcp:
   host: "0.0.0.0"
   port: 7788
-  auth: true                   # require API_KEY env var for all requests

@@ -1,5 +1,6 @@
 """Load and validate config from config.yaml. Fail fast on missing/invalid keys."""
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -44,7 +45,18 @@ def load_config(config_path: str | Path = "config.yaml") -> dict[str, Any]:
     if "index_root" not in raw:
         raise ValueError("Config missing required key: index_root")
 
-    docs_path = Path(docs_root)
+    # --- Env var overrides (for VPS / container deployments) ---
+    env_docs_root = os.environ.get("DOCUMENTS_ROOT")
+    if env_docs_root:
+        raw["documents_root"] = env_docs_root
+        raw["vault_root"] = env_docs_root
+
+    env_index_root = os.environ.get("INDEX_ROOT")
+    if env_index_root:
+        raw["index_root"] = env_index_root
+
+    # Validate documents_root exists (after env var overrides)
+    docs_path = Path(raw["documents_root"])
     if not docs_path.exists():
         raise ValueError(f"documents_root does not exist: {docs_path}")
 

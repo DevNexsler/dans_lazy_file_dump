@@ -18,6 +18,7 @@ These items from the original plan are **complete**:
 - [x] Taxonomy system for consistent tagging (7 MCP CRUD tools)
 - [x] MCP HTTP mode already works (`--http` flag)
 - [x] 358 tests passing
+- [x] **Phase 1: Deployable Server** — env var overrides, Bearer token auth, `server.py` entrypoint, Dockerfile, Render.com config
 
 ---
 
@@ -43,19 +44,41 @@ The core engine is already cloud-API-only (no local GPU). The remaining VPS work
 
 ## Remaining Work — 3 Phases
 
-### Phase 1: Deployable Server (minimum viable VPS)
+### Phase 1: Deployable Server (DONE)
 
 **Goal:** Run on a VPS, accept MCP connections over HTTP, serve from persistent disk.
 
-| Task | What to do | Complexity |
-|------|-----------|------------|
-| **`server.py`** | Unified entrypoint: starts MCP HTTP server on `$PORT` (default 7788). Just wraps existing `mcp_server.py --http`. | Small — ~30 lines |
-| **`Dockerfile`** | Python 3.13-slim, `pip install -r requirements.txt`, `VOLUME /data`, `CMD python server.py` | Small |
-| **`config.vps.yaml.example`** | Same as cloud config but with `/data/documents` and `/data/index` paths | Small — copy + edit |
-| **Auth middleware** | `API_KEY` env var checked on every HTTP request. Single `Bearer` token. Add to `mcp_server.py` HTTP handler. | Small — ~20 lines |
-| **Env var overrides** | `DOCUMENTS_ROOT`, `INDEX_ROOT`, `PORT` override config.yaml values | Small — in `core/config.py` |
+| Task | Status | Details |
+|------|--------|---------|
+| **`server.py`** | Done | Unified entrypoint: starts MCP HTTP on `$PORT` (default 7788) |
+| **`Dockerfile`** | Done | Python 3.13-slim, filters out macOS-only deps (mlx-*) |
+| **Auth middleware** | Done | ASGI middleware in `mcp_server.py` — checks `Authorization: Bearer <API_KEY>` env var. No auth when unset. |
+| **Env var overrides** | Done | `DOCUMENTS_ROOT`, `INDEX_ROOT`, `PORT` override config.yaml in `core/config.py` |
+| **`config.vps.yaml.example`** | Done | VPS paths + S3 URI examples |
+| **`render.yaml`** | Done | Render.com deployment descriptor with persistent disk |
 
-**Result:** `docker build && docker run -v /data:/data -e API_KEY=... -e OPENROUTER_API_KEY=...` and it works. MCP clients connect via HTTP/SSE.
+**Usage:** `docker build -t doc-organizer . && docker run -v /tmp/data:/data -p 7788:7788 -e API_KEY=secret doc-organizer`
+
+#### LanceDB S3 Storage (config-only, no code changes)
+
+LanceDB v0.29.2 (already installed) natively supports `s3://`, `gs://`, and `az://` URIs. Switching from local disk to shared cloud storage is a **config-only change**:
+
+```yaml
+# Just change the URI:
+index_root: "s3://my-bucket/doc-organizer-index"
+
+# Add credentials:
+storage_options:
+  aws_access_key_id: "${AWS_ACCESS_KEY_ID}"
+  aws_secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
+  region: "us-east-1"
+
+# For read consistency across instances:
+lancedb:
+  read_consistency_interval_seconds: 5
+```
+
+Both `lancedb_store.py` and `taxonomy_store.py` call `lancedb.connect(index_root)` — S3 URIs work transparently. The only code addition needed is passing `storage_options` and `read_consistency_interval` from config to the `lancedb.connect()` calls.
 
 ### Phase 2: Document Ingestion API
 
@@ -74,14 +97,13 @@ The core engine is already cloud-API-only (no local GPU). The remaining VPS work
 
 ### Phase 3: Platform Configs (as needed)
 
-| Platform | Config file | Notes |
-|----------|------------|-------|
-| **Render.com** | `render.yaml` | Render Disk at `/data`, auto-deploy from git |
-| **Docker Compose** | `docker-compose.yml` | Optional Prefect container if you want dashboards |
-| **Systemd** | `doc-organizer.service` | For bare-metal VPS (Hetzner, DO, etc.) |
-| **Fly.io** | `fly.toml` | Fly Volume for persistence |
-
-Add these as needed per deployment target. Don't pre-build all of them.
+| Platform | Config file | Status |
+|----------|------------|--------|
+| **Render.com** | `render.yaml` | Done (Phase 1) |
+| **Docker** | `Dockerfile` | Done (Phase 1) |
+| **Docker Compose** | `docker-compose.yml` | Add when needed |
+| **Systemd** | `doc-organizer.service` | Add when needed |
+| **Fly.io** | `fly.toml` | Add when needed |
 
 ---
 

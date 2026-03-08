@@ -19,6 +19,12 @@ LLM document enrichment (optional):
 - Summary and topics are prepended to chunk contextual headers.
 - All enrichment fields are stored in LanceDB for filtering and search.
 
+Auto-recovery:
+- After indexing, the flow validates the table is readable.
+- If LanceDB corruption is detected (missing files from interrupted writes),
+  it walks versions backward, exports data from the last clean version,
+  and recreates the table automatically.
+
 Complex objects (store, embed_provider, splitter, ocr_provider) are built inside
 the flow and passed to tasks via a shared module-level dict (_RUNTIME) rather
 than as task arguments.  This avoids Prefect 3's input-serialisation warnings
@@ -27,6 +33,7 @@ while keeping the flow easy to read.
 
 import os
 import re
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -518,6 +525,68 @@ def write_index_metadata_task(
         json.dump(meta, f, indent=2)
 
 
+def _recover_corrupt_table(index_root: str | Path, table_name: str, logger) -> LanceDBStore | None:
+    """Detect and auto-recover a corrupt LanceDB table.
+
+    Walks versions backward to find the last readable one, exports its data,
+    and recreates the table. Returns a new LanceDBStore on success, None on failure.
+    """
+    import lance
+
+    lance_path = str(Path(index_root) / f"{table_name}.lance")
+    if not Path(lance_path).exists():
+        return None
+
+    logger.warning("Corruption detected — attempting auto-recovery for %s", lance_path)
+
+    # Find the last clean version
+    try:
+        ds = lance.dataset(lance_path)
+        versions = sorted(ds.versions(), key=lambda x: x["version"], reverse=True)
+    except Exception as exc:
+        logger.error("Cannot read dataset versions: %s", exc)
+        return None
+
+    clean_table = None
+    clean_version = None
+    for v in versions:
+        ver = v["version"]
+        try:
+            ds_v = lance.dataset(lance_path, version=ver)
+            clean_table = ds_v.to_table()
+            clean_version = ver
+            break
+        except Exception:
+            continue
+
+    if clean_table is None:
+        logger.error("No readable version found — manual recovery needed")
+        return None
+
+    logger.info(
+        "Found clean version %d with %d rows — rebuilding table",
+        clean_version, clean_table.num_rows,
+    )
+
+    # Move corrupt dataset aside and write clean one
+    corrupt_path = lance_path + ".corrupt"
+    if Path(corrupt_path).exists():
+        shutil.rmtree(corrupt_path)
+    shutil.move(lance_path, corrupt_path)
+    lance.write_dataset(clean_table, lance_path)
+
+    # Verify the new dataset
+    ds_new = lance.dataset(lance_path)
+    _ = ds_new.to_table(limit=1)
+    logger.info(
+        "Recovery complete: %d rows restored. Corrupt backup at %s",
+        ds_new.count_rows(), corrupt_path,
+    )
+
+    # Return a fresh store pointing at the rebuilt table
+    return LanceDBStore(index_root, table_name)
+
+
 # --- Flow ---
 
 
@@ -660,9 +729,32 @@ def index_vault_flow(config_path: str = "config.yaml") -> None:
 
     run_seconds = time.perf_counter() - t0
     index_stats_task(len(to_add_or_update), len(to_delete), run_seconds)
-    doc_count = len(store.list_doc_ids())
+
+    # Read final counts — auto-recover if table is corrupt
+    table_name = config.get("lancedb", {}).get("table", "chunks")
+    try:
+        doc_count = len(store.list_doc_ids())
+        chunk_count = store.count_chunks()
+    except Exception as exc:
+        logger.error("Post-index read failed (possible corruption): %s", exc)
+        _RUNTIME.setdefault("_warnings", []).append(f"corruption_detected: {exc}")
+        recovered_store = _recover_corrupt_table(index_root, table_name, logger)
+        if recovered_store:
+            store = recovered_store
+            _RUNTIME["store"] = store
+            try:
+                store.create_fts_index()
+            except Exception as fts_exc:
+                logger.warning("FTS rebuild after recovery failed: %s", fts_exc)
+            doc_count = len(store.list_doc_ids())
+            chunk_count = store.count_chunks()
+            _RUNTIME.setdefault("_warnings", []).append("auto_recovery_succeeded")
+        else:
+            logger.error("Auto-recovery failed — manual intervention needed")
+            raise
+
     write_index_metadata_task(
-        index_root, doc_count, store.count_chunks(),
+        index_root, doc_count, chunk_count,
         failed_docs or None,
         _RUNTIME.get("_warnings") or None,
     )

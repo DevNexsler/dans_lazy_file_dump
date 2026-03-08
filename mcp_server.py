@@ -1140,7 +1140,41 @@ if HAS_MCP and FastMCP is not None:
         if transport == "stdio":
             mcp.run(transport="stdio")
         else:
-            mcp.run(transport=transport, host=host, port=port)
+            import anyio
+
+            async def _run_http():
+                import uvicorn
+                from starlette.applications import Starlette
+                from starlette.middleware import Middleware
+                from starlette.requests import Request
+                from starlette.responses import JSONResponse
+
+                api_key = os.environ.get("API_KEY")
+
+                app = mcp.streamable_http_app()
+
+                if api_key:
+                    original_app = app
+
+                    async def auth_app(scope, receive, send):
+                        if scope["type"] == "http":
+                            request = Request(scope, receive)
+                            auth_header = request.headers.get("authorization", "")
+                            if auth_header != f"Bearer {api_key}":
+                                response = JSONResponse(
+                                    {"error": "Unauthorized"}, status_code=401
+                                )
+                                await response(scope, receive, send)
+                                return
+                        await original_app(scope, receive, send)
+
+                    app = auth_app
+
+                config = uvicorn.Config(app, host=host, port=port, log_level="info")
+                server = uvicorn.Server(config)
+                await server.serve()
+
+            anyio.run(_run_http)
 else:
     def run_server(transport: str = "stdio", host: str = "127.0.0.1", port: int = 7788):
         print("Install mcp to run the server: pip install mcp")
@@ -1162,10 +1196,8 @@ if __name__ == "__main__":
     with PrefectServer():
         # Default: stdio (for OpenClaw). Pass --http for browser/testing.
         if "--http" in sys.argv:
-            run_server(
-                transport="streamable-http",
-                host=mcp_cfg.get("host", "127.0.0.1"),
-                port=mcp_cfg.get("port", 7788),
-            )
+            host = mcp_cfg.get("host", "0.0.0.0")
+            port = int(os.environ.get("PORT", mcp_cfg.get("port", 7788)))
+            run_server(transport="streamable-http", host=host, port=port)
         else:
             run_server(transport="stdio")
