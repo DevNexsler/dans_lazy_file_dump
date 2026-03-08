@@ -390,52 +390,52 @@ class TestLengthNormInHybrid:
 class TestImportanceWeighting:
     def test_high_importance_boosted(self):
         """A high-importance doc should score higher than a low-importance one."""
-        high = SearchHit(doc_id="high.md", loc="c:0", snippet="x", text="x", score=1.0)
-        high.extra_metadata = {"importance": "1.0"}
-        low = SearchHit(doc_id="low.md", loc="c:0", snippet="x", text="x", score=1.0)
-        low.extra_metadata = {"importance": "0.0"}
-        result = _apply_importance_weighting([low, high], field="importance", weight=0.3)
+        high = SearchHit(doc_id="high.md", loc="c:0", snippet="x", text="x", score=1.0,
+                         enr_importance="1.0")
+        low = SearchHit(doc_id="low.md", loc="c:0", snippet="x", text="x", score=1.0,
+                        enr_importance="0.0")
+        result = _apply_importance_weighting([low, high], field="enr_importance", weight=0.3)
         assert result[0].doc_id == "high.md"
         assert result[1].score < result[0].score
 
     def test_default_weight_magnitude(self):
         """With weight=0.3, importance=1.0 gives 1.0x and importance=0.0 gives 0.7x."""
-        high = SearchHit(doc_id="a.md", loc="c:0", snippet="x", text="x", score=1.0)
-        high.extra_metadata = {"importance": "1.0"}
-        _apply_importance_weighting([high], field="importance", weight=0.3)
+        high = SearchHit(doc_id="a.md", loc="c:0", snippet="x", text="x", score=1.0,
+                         enr_importance="1.0")
+        _apply_importance_weighting([high], field="enr_importance", weight=0.3)
         assert high.score == pytest.approx(1.0)
 
-        low = SearchHit(doc_id="b.md", loc="c:0", snippet="x", text="x", score=1.0)
-        low.extra_metadata = {"importance": "0.0"}
-        _apply_importance_weighting([low], field="importance", weight=0.3)
+        low = SearchHit(doc_id="b.md", loc="c:0", snippet="x", text="x", score=1.0,
+                        enr_importance="0.0")
+        _apply_importance_weighting([low], field="enr_importance", weight=0.3)
         assert low.score == pytest.approx(0.7)
 
     def test_missing_field_is_neutral(self):
         """A hit with no importance field should get neutral treatment (0.5)."""
         hit = SearchHit(doc_id="a.md", loc="c:0", snippet="x", text="x", score=1.0)
-        _apply_importance_weighting([hit], field="importance", weight=0.3)
+        _apply_importance_weighting([hit], field="enr_importance", weight=0.3)
         # 0.7 + 0.3 * 0.5 = 0.85
         assert hit.score == pytest.approx(0.85)
 
     def test_invalid_field_is_neutral(self):
         """Non-numeric importance values should default to neutral."""
-        hit = SearchHit(doc_id="a.md", loc="c:0", snippet="x", text="x", score=1.0)
-        hit.extra_metadata = {"importance": "high"}
-        _apply_importance_weighting([hit], field="importance", weight=0.3)
+        hit = SearchHit(doc_id="a.md", loc="c:0", snippet="x", text="x", score=1.0,
+                        enr_importance="high")
+        _apply_importance_weighting([hit], field="enr_importance", weight=0.3)
         assert hit.score == pytest.approx(0.85)
 
     def test_clamped_to_range(self):
         """Values outside [0, 1] should be clamped."""
-        hit = SearchHit(doc_id="a.md", loc="c:0", snippet="x", text="x", score=1.0)
-        hit.extra_metadata = {"importance": "5.0"}
-        _apply_importance_weighting([hit], field="importance", weight=0.3)
+        hit = SearchHit(doc_id="a.md", loc="c:0", snippet="x", text="x", score=1.0,
+                        enr_importance="5.0")
+        _apply_importance_weighting([hit], field="enr_importance", weight=0.3)
         assert hit.score == pytest.approx(1.0)  # clamped to 1.0
 
     def test_zero_weight_disables(self):
         """With weight=0.0, importance should have no effect."""
-        hit = SearchHit(doc_id="a.md", loc="c:0", snippet="x", text="x", score=1.0)
-        hit.extra_metadata = {"importance": "0.0"}
-        _apply_importance_weighting([hit], field="importance", weight=0.0)
+        hit = SearchHit(doc_id="a.md", loc="c:0", snippet="x", text="x", score=1.0,
+                        enr_importance="0.0")
+        _apply_importance_weighting([hit], field="enr_importance", weight=0.0)
         assert hit.score == pytest.approx(1.0)
 
     def test_custom_field_name(self):

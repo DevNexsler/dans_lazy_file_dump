@@ -159,7 +159,7 @@ def _apply_length_normalization(
 
 def _apply_importance_weighting(
     hits: list[SearchHit],
-    field: str = "importance",
+    field: str = "enr_importance",
     weight: float = 0.3,
 ) -> list[SearchHit]:
     """Boost documents with higher importance/priority metadata.
@@ -181,12 +181,12 @@ def _apply_importance_weighting(
     for hit in hits:
         # Try direct attribute, then extra_metadata
         raw = getattr(hit, field, None)
-        if raw is None:
+        if not raw:  # None or empty string
             raw = (hit.extra_metadata or {}).get(field)
 
         # Parse to float, default to 0.5 (neutral) if missing/invalid
         try:
-            importance = float(raw) if raw is not None else 0.5
+            importance = float(raw) if raw else 0.5
         except (TypeError, ValueError):
             importance = 0.5
 
@@ -545,7 +545,7 @@ def hybrid_search(
     metadata_filters: dict[str, str] | None = None,
     enr_doc_type: str | None = None,
     enr_topics: str | None = None,
-    importance_field: str = "importance",
+    importance_field: str = "enr_importance",
     importance_weight: float = 0.3,
     min_score_threshold: float = 0.0,
 ) -> SearchResult:

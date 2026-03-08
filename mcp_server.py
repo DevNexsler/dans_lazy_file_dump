@@ -215,7 +215,7 @@ def _file_search_impl(
             metadata_filters=parsed_filters,
             enr_doc_type=enr_doc_type,
             enr_topics=enr_topics,
-            importance_field=importance_cfg.get("field", "importance"),
+            importance_field=importance_cfg.get("field", "enr_importance"),
             importance_weight=importance_cfg.get("weight", 0.3),
             min_score_threshold=search_cfg.get("min_score_threshold", 0.0),
         )
