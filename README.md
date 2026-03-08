@@ -194,7 +194,7 @@ Document Collection                    AI Assistants
 
 **Rich metadata & filtering** — YAML frontmatter (tags, status, author, dates, custom fields) is automatically extracted and promoted to filterable columns. Custom frontmatter keys are auto-promoted — no schema changes needed.
 
-**MCP server** — Exposes 17 tools over the Model Context Protocol. Any MCP-compatible assistant can search, browse, filter your documents, and manage taxonomy entries. Works over stdio (launched automatically by the assistant) or HTTP.
+**MCP server** — Exposes 16 tools over the Model Context Protocol. Any MCP-compatible assistant can search, browse, filter your documents, and manage taxonomy entries. Works over stdio (launched automatically by the assistant) or HTTP.
 
 **Incremental updates** — Only new and modified files are processed on re-index. Deleted files are cleaned up automatically. Failed documents are tracked and retried.
 
@@ -243,7 +243,7 @@ extractors.py                Text extraction (MD, PDF, images)
 flow_index_vault.py          Prefect indexing flow
 lancedb_store.py             LanceDB storage + search
 search_hybrid.py             8-step hybrid search pipeline
-mcp_server.py                MCP server (stdio + HTTP, 17 tools)
+mcp_server.py                MCP server (stdio + HTTP, 16 tools)
 server.py                    VPS entrypoint — starts HTTP server on $PORT
 run_index.py                 CLI entrypoint
 scripts/seed_taxonomy.py     Import taxonomy from existing SQLite DBs
