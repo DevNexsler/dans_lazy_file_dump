@@ -127,10 +127,10 @@ async def download(request: Request) -> FileResponse | JSONResponse:
     if file_path is None:
         return _api_error("invalid_path", "Path escapes documents root")
 
-    try:
-        return FileResponse(file_path, filename=file_path.name)
-    except (FileNotFoundError, RuntimeError):
+    if not file_path.is_file():
         return _api_error("not_found", f"File not found: {doc_id}", 404)
+
+    return FileResponse(file_path, filename=file_path.name)
 
 
 async def list_documents(request: Request) -> JSONResponse:
