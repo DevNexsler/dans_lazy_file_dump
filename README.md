@@ -182,7 +182,7 @@ Document Collection                    AI Assistants
                                             file_recent ...
 ```
 
-**Hybrid search** — Every query runs vector (semantic) and keyword (BM25) search in parallel, fuses results with Reciprocal Rank Fusion, then reranks with a cross-encoder. Pre-filters (tags, folders, doc type, topics) apply at the database level before retrieval so every result matches.
+**Hybrid search** — Every query runs vector (semantic) and keyword (BM25) search in parallel, fuses results with Reciprocal Rank Fusion, applies length normalization, importance weighting, optional recency boost with time decay floor, cross-encoder reranking (60/40 blend with cosine fallback), MMR diversity filtering, and minimum score thresholding. Pre-filters (tags, folders, doc type, topics) apply at the database level before retrieval so every result matches.
 
 **Multi-format extraction** — Indexes Markdown, PDFs, and images. PDFs use text extraction first, falling back to OCR for scanned pages. Images get OCR text plus visual descriptions. EXIF metadata (camera, GPS, dates) is extracted automatically.
 
@@ -194,7 +194,7 @@ Document Collection                    AI Assistants
 
 **Rich metadata & filtering** — YAML frontmatter (tags, status, author, dates, custom fields) is automatically extracted and promoted to filterable columns. Custom frontmatter keys are auto-promoted — no schema changes needed.
 
-**MCP server** — Exposes 17 tools over the Model Context Protocol. Any MCP-compatible assistant can search, browse, filter your documents, and manage taxonomy entries. Works over stdio (launched automatically by the assistant) or HTTP.
+**MCP server** — Exposes 16 tools over the Model Context Protocol. Any MCP-compatible assistant can search, browse, filter your documents, and manage taxonomy entries. Works over stdio (launched automatically by the assistant) or HTTP.
 
 **Incremental updates** — Only new and modified files are processed on re-index. Deleted files are cleaned up automatically. Failed documents are tracked and retried.
 
@@ -234,16 +234,16 @@ python -m pytest tests/ -x                   # ~358 full suite (requires API key
 
 ```
 core/                        Config, storage interface, taxonomy helpers
-providers/embed/             Embedding providers (OpenRouter, Ollama, Gemini)
-providers/llm/               LLM providers (OpenRouter, Ollama)
+providers/embed/             Embedding providers (OpenRouter, Ollama, Baseten, LlamaIndex)
+providers/llm/               LLM providers (OpenRouter, Ollama, Baseten)
 providers/ocr/               OCR providers (Gemini Vision, DeepSeek OCR2)
 taxonomy_store.py            Taxonomy LanceDB store (CRUD, vector search, FTS)
 doc_enrichment.py            LLM metadata extraction (with taxonomy integration)
 extractors.py                Text extraction (MD, PDF, images)
 flow_index_vault.py          Prefect indexing flow
 lancedb_store.py             LanceDB storage + search
-search_hybrid.py             4-stage hybrid search pipeline
-mcp_server.py                MCP server (stdio + HTTP, 17 tools)
+search_hybrid.py             10-step hybrid search pipeline
+mcp_server.py                MCP server (stdio + HTTP, 16 tools)
 server.py                    VPS entrypoint — starts HTTP server on $PORT
 run_index.py                 CLI entrypoint
 scripts/seed_taxonomy.py     Import taxonomy from existing SQLite DBs

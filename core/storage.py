@@ -40,6 +40,9 @@ class SearchHit:
         # Taxonomy-suggested fields from enrichment
         enr_suggested_tags: str = "",
         enr_suggested_folder: str = "",
+        # Importance score (0.0-1.0) and its source
+        enr_importance: str = "",
+        enr_importance_source: str = "",
         # Dynamic metadata (fields not in the hardcoded set above)
         extra_metadata: dict[str, str] | None = None,
     ):
@@ -72,6 +75,8 @@ class SearchHit:
         self.enr_key_facts = enr_key_facts
         self.enr_suggested_tags = enr_suggested_tags
         self.enr_suggested_folder = enr_suggested_folder
+        self.enr_importance = enr_importance
+        self.enr_importance_source = enr_importance_source
         # Dynamic metadata for fields added after initial schema
         self.extra_metadata = extra_metadata or {}
 

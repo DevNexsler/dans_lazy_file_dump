@@ -191,6 +191,7 @@ def _file_search_impl(
     try:
         search_cfg = config.get("search", {})
         recency_cfg = search_cfg.get("recency", {})
+        importance_cfg = search_cfg.get("importance", {})
 
         reranker = build_reranker(config)
 
@@ -214,6 +215,9 @@ def _file_search_impl(
             metadata_filters=parsed_filters,
             enr_doc_type=enr_doc_type,
             enr_topics=enr_topics,
+            importance_field=importance_cfg.get("field", "enr_importance"),
+            importance_weight=importance_cfg.get("weight", 0.3),
+            min_score_threshold=search_cfg.get("min_score_threshold", 0.0),
         )
     except Exception as exc:
         return _error("search_failed", f"Search operation failed: {exc}",

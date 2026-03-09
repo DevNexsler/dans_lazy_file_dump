@@ -39,8 +39,16 @@ Extract metadata from this document. Respond with ONLY valid JSON, no other text
   "keywords": ["10-20 specific terms and phrases"],
   "key_facts": ["most important facts, conclusions, or action items"],
   "suggested_tags": ["classification tags for this document"],
-  "suggested_folder": "best folder path for filing this document"
+  "suggested_folder": "best folder path for filing this document",
+  "importance": 0.5
 }}
+
+For "importance": rate the document's overall importance/usefulness on a 0.0-1.0 scale:
+- 1.0 = critical reference, frequently needed, high-value knowledge
+- 0.7-0.9 = important, actionable, or broadly useful
+- 0.4-0.6 = average utility, general notes or routine content
+- 0.1-0.3 = low importance, ephemeral, or narrowly relevant
+- 0.0 = trivial, outdated, or noise
 {taxonomy_block}
 Document title: {title}
 Document type: {source_type}
@@ -67,6 +75,7 @@ _ENRICHMENT_KEYS_RAW = (
     "key_facts",
     "suggested_tags",
     "suggested_folder",
+    "importance",
 )
 
 # Prefixed field names stored in LanceDB metadata (prevent collision with frontmatter)
@@ -194,6 +203,13 @@ def _normalize_enrichment(raw: dict[str, Any]) -> dict[str, str]:
         value = raw.get(raw_key)
         if value is None:
             result[enr_key] = ""
+        elif raw_key == "importance":
+            # Normalize to a clamped float string
+            try:
+                imp = max(0.0, min(1.0, float(value)))
+            except (TypeError, ValueError):
+                imp = 0.5
+            result[enr_key] = str(imp)
         elif raw_key in ("summary", "suggested_folder"):
             result[enr_key] = str(value).strip()
         elif raw_key == "key_facts":

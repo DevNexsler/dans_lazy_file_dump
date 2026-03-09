@@ -571,6 +571,33 @@ class LanceDBStore:
 
         return result
 
+    def get_vector(self, chunk_uid: str) -> list[float] | None:
+        """Retrieve the stored embedding vector for a chunk by its UID (doc_id::loc).
+
+        Used by MMR diversity and cosine fallback reranking. Returns None if
+        the chunk is not found or the table doesn't exist yet.
+        """
+        try:
+            table = self._vs.table
+        except TableNotFoundError:
+            return None
+        rows = (
+            table.search(None)
+            .where(f"id = '{self._sql_escape(chunk_uid)}'", prefilter=True)
+            .select(["vector"])
+            .limit(1)
+            .to_list()
+        )
+        if not rows:
+            return None
+        vec = rows[0].get("vector")
+        if vec is None:
+            return None
+        # Convert from Arrow/numpy to plain list if needed
+        if hasattr(vec, "tolist"):
+            return vec.tolist()
+        return list(vec)
+
     def get_chunk(self, doc_id: str, loc: str) -> SearchHit | None:
         """Get a single chunk by doc_id and loc.
 

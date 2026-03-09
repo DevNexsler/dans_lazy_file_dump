@@ -372,6 +372,24 @@ def process_doc_task(doc: dict) -> None:
     else:
         doc_meta.update(empty_enrichment())
 
+    # --- Importance: frontmatter overrides LLM, track source ---
+    fm_importance = fm.get("importance")
+    if fm_importance is not None:
+        # User provided importance in YAML frontmatter — use it
+        try:
+            imp_val = max(0.0, min(1.0, float(fm_importance)))
+        except (TypeError, ValueError):
+            imp_val = 0.5
+        doc_meta["enr_importance"] = str(imp_val)
+        doc_meta["enr_importance_source"] = "frontmatter"
+    elif doc_meta.get("enr_importance"):
+        # LLM generated it during enrichment
+        doc_meta["enr_importance_source"] = "llm"
+    else:
+        # No enrichment and no frontmatter — neutral default
+        doc_meta["enr_importance"] = "0.5"
+        doc_meta["enr_importance_source"] = "default"
+
     # --- Chunk and build nodes ---
     # Three paths:
     #   1. Multi-page PDF  → page-aware chunks, context header per page
