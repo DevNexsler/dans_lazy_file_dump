@@ -23,6 +23,7 @@ from search_hybrid import (
     _cosine_fallback_rerank,
     _cosine_similarity,
     hybrid_search,
+    reciprocal_rank_fusion,
     Reranker,
     SearchResult,
 )
@@ -491,3 +492,241 @@ class TestMinScoreThreshold:
         ]
         result = _apply_min_score_threshold(hits, threshold=0.05)
         assert len(result) == 1
+
+    def test_all_filtered_returns_empty(self):
+        """When all hits are below threshold, return empty list."""
+        hits = [
+            SearchHit(doc_id="a.md", loc="c:0", snippet="x", text="x", score=0.01),
+            SearchHit(doc_id="b.md", loc="c:0", snippet="x", text="x", score=0.02),
+        ]
+        result = _apply_min_score_threshold(hits, threshold=0.5)
+        assert result == []
+
+    def test_negative_threshold_passes_all(self):
+        """Negative threshold should behave like 0 (disabled)."""
+        hits = [
+            SearchHit(doc_id="a.md", loc="c:0", snippet="x", text="x", score=0.001),
+        ]
+        result = _apply_min_score_threshold(hits, threshold=-1.0)
+        assert len(result) == 1
+
+
+# ---------------------------------------------------------------------------
+# Reciprocal Rank Fusion
+# ---------------------------------------------------------------------------
+
+class TestReciprocalRankFusion:
+    def test_single_list(self):
+        """RRF with a single result list should preserve order."""
+        hits = [
+            SearchHit(doc_id="a.md", loc="c:0", snippet="x", text="x", score=1.0),
+            SearchHit(doc_id="b.md", loc="c:0", snippet="x", text="x", score=0.5),
+        ]
+        result = reciprocal_rank_fusion([hits])
+        assert result[0].doc_id == "a.md"
+        assert result[1].doc_id == "b.md"
+        assert result[0].score > result[1].score
+
+    def test_two_lists_boost_overlap(self):
+        """A doc appearing in both lists should score higher than one in only one list."""
+        list_a = [
+            SearchHit(doc_id="both.md", loc="c:0", snippet="x", text="x", score=1.0),
+            SearchHit(doc_id="only_a.md", loc="c:0", snippet="x", text="x", score=0.5),
+        ]
+        list_b = [
+            SearchHit(doc_id="both.md", loc="c:0", snippet="x", text="x", score=1.0),
+            SearchHit(doc_id="only_b.md", loc="c:0", snippet="x", text="x", score=0.5),
+        ]
+        result = reciprocal_rank_fusion([list_a, list_b])
+        assert result[0].doc_id == "both.md"
+        # both.md gets 2 * 1/(60+1), others get 1/(60+1) + 1/(60+2)
+        assert result[0].score > result[1].score
+
+    def test_deduplicates_by_doc_loc(self):
+        """Same (doc_id, loc) from multiple lists should appear only once."""
+        list_a = [SearchHit(doc_id="a.md", loc="c:0", snippet="x", text="x", score=1.0)]
+        list_b = [SearchHit(doc_id="a.md", loc="c:0", snippet="x", text="x", score=1.0)]
+        result = reciprocal_rank_fusion([list_a, list_b])
+        assert len(result) == 1
+
+    def test_empty_lists(self):
+        """Empty input lists should return empty output."""
+        assert reciprocal_rank_fusion([]) == []
+        assert reciprocal_rank_fusion([[], []]) == []
+
+    def test_many_lists_fair_merge(self):
+        """RRF should correctly merge 3+ lists."""
+        lists = [
+            [SearchHit(doc_id=f"d{i}.md", loc="c:0", snippet="x", text="x", score=1.0)]
+            for i in range(5)
+        ]
+        result = reciprocal_rank_fusion(lists)
+        assert len(result) == 5
+        # All first-ranked → all get same score
+        scores = [h.score for h in result]
+        assert all(s == scores[0] for s in scores)
+
+
+# ---------------------------------------------------------------------------
+# Importance weighting — additional edge cases
+# ---------------------------------------------------------------------------
+
+class TestImportanceWeightingEdgeCases:
+    def test_empty_list(self):
+        """Empty hit list should not crash."""
+        result = _apply_importance_weighting([], field="enr_importance", weight=0.3)
+        assert result == []
+
+    def test_negative_importance_clamped_to_zero(self):
+        """Negative importance should be clamped to 0.0."""
+        hit = SearchHit(doc_id="a.md", loc="c:0", snippet="x", text="x", score=1.0,
+                        enr_importance="-0.5")
+        _apply_importance_weighting([hit], field="enr_importance", weight=0.3)
+        assert hit.score == pytest.approx(0.7)  # (1-0.3) + 0.3*0 = 0.7
+
+    def test_nan_importance_is_neutral(self):
+        """NaN importance value should default to neutral (0.5)."""
+        hit = SearchHit(doc_id="a.md", loc="c:0", snippet="x", text="x", score=1.0,
+                        enr_importance="nan")
+        _apply_importance_weighting([hit], field="enr_importance", weight=0.3)
+        # float("nan") parses but is NaN — should be handled
+        # If not handled, score will be NaN
+        assert not math.isnan(hit.score)
+        assert hit.score == pytest.approx(0.85)
+
+    def test_inf_importance_is_neutral(self):
+        """Inf importance should default to neutral (0.5), not max boost."""
+        hit = SearchHit(doc_id="a.md", loc="c:0", snippet="x", text="x", score=1.0,
+                        enr_importance="inf")
+        _apply_importance_weighting([hit], field="enr_importance", weight=0.3)
+        assert hit.score == pytest.approx(0.85)  # neutral: 0.7 + 0.3*0.5
+
+    def test_zero_score_stays_zero(self):
+        """A hit with score=0.0 should remain 0.0 regardless of importance."""
+        hit = SearchHit(doc_id="a.md", loc="c:0", snippet="x", text="x", score=0.0,
+                        enr_importance="1.0")
+        _apply_importance_weighting([hit], field="enr_importance", weight=0.3)
+        assert hit.score == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Recency boost — additional edge cases
+# ---------------------------------------------------------------------------
+
+class TestRecencyBoostEdgeCases:
+    def test_empty_list(self):
+        """Empty hit list should not crash."""
+        result = _apply_recency_boost([], half_life_days=90)
+        assert result == []
+
+    def test_zero_mtime_skipped(self):
+        """A hit with mtime=0 should not get recency boost."""
+        hit = SearchHit(doc_id="a.md", loc="c:0", snippet="x", text="x", score=1.0, mtime=0.0)
+        _apply_recency_boost([hit], half_life_days=90, weight=0.3)
+        assert hit.score == 1.0  # unchanged
+
+    def test_none_mtime_skipped(self):
+        """A hit with mtime=None should not crash."""
+        hit = SearchHit(doc_id="a.md", loc="c:0", snippet="x", text="x", score=1.0, mtime=None)
+        _apply_recency_boost([hit], half_life_days=90, weight=0.3)
+        assert hit.score == 1.0  # unchanged
+
+    def test_future_mtime_no_negative_age(self):
+        """A hit with mtime in the future should not get negative age."""
+        hit = SearchHit(doc_id="a.md", loc="c:0", snippet="x", text="x",
+                        score=1.0, mtime=time.time() + 86400)
+        _apply_recency_boost([hit], half_life_days=90, weight=0.3)
+        # age clamped to 0 → max boost
+        assert hit.score > 1.0
+
+
+# ---------------------------------------------------------------------------
+# Length normalization — additional edge cases
+# ---------------------------------------------------------------------------
+
+class TestLengthNormEdgeCases:
+    def test_empty_list(self):
+        """Empty hit list should not crash."""
+        result = _apply_length_normalization([])
+        assert result == []
+
+    def test_none_text_unaffected(self):
+        """A hit with text=None should not crash."""
+        hit = SearchHit(doc_id="a.md", loc="c:0", snippet="x", text=None, score=1.0)
+        result = _apply_length_normalization([hit], anchor=800)
+        assert result[0].score == 1.0
+
+
+# ---------------------------------------------------------------------------
+# Pipeline integration — multiple steps combined
+# ---------------------------------------------------------------------------
+
+class TestPipelineIntegration:
+    def test_empty_query_returns_empty(self):
+        """An empty query should return empty results immediately."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            vec = [1.0] + [0.0] * 767
+            nodes = [_make_node("a.md", "c:0", "test content", vec)]
+            store = _build_store_with_fts(tmpdir, nodes)
+            embed = MockEmbedProvider(vec)
+
+            result = hybrid_search(store, embed, "", vector_top_k=10, final_top_k=5)
+            assert len(result) == 0
+
+    def test_whitespace_query_returns_empty(self):
+        """A whitespace-only query should return empty results."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            vec = [1.0] + [0.0] * 767
+            nodes = [_make_node("a.md", "c:0", "test content", vec)]
+            store = _build_store_with_fts(tmpdir, nodes)
+            embed = MockEmbedProvider(vec)
+
+            result = hybrid_search(store, embed, "   ", vector_top_k=10, final_top_k=5)
+            assert len(result) == 0
+
+    def test_high_min_threshold_filters_all(self):
+        """A very high min_score_threshold should return zero results gracefully."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            vec = [1.0] + [0.0] * 767
+            nodes = [_make_node("a.md", "c:0", "test content about cats", vec)]
+            store = _build_store_with_fts(tmpdir, nodes)
+            embed = MockEmbedProvider(vec)
+
+            result = hybrid_search(
+                store, embed, "cats", vector_top_k=10, final_top_k=5,
+                min_score_threshold=999.0,
+            )
+            assert len(result) == 0
+
+    def test_importance_weight_zero_no_effect(self):
+        """With importance_weight=0, scores should be unaffected by importance."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            vec = [1.0] + [0.0] * 767
+            nodes = [
+                _make_node("a.md", "c:0", "document about cats", vec, enr_importance="0.0"),
+                _make_node("b.md", "c:0", "document about cats", vec, enr_importance="1.0"),
+            ]
+            store = _build_store_with_fts(tmpdir, nodes)
+            embed = MockEmbedProvider(vec)
+
+            result = hybrid_search(
+                store, embed, "cats", vector_top_k=10, final_top_k=5,
+                importance_weight=0.0,
+            )
+            # With weight=0, importance has no effect; scores should be equal
+            if len(result) >= 2:
+                assert abs(result[0].score - result[1].score) < 0.01
+
+    def test_diagnostics_present(self):
+        """Every search result should include diagnostics dict."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            vec = [1.0] + [0.0] * 767
+            nodes = [_make_node("a.md", "c:0", "test content", vec)]
+            store = _build_store_with_fts(tmpdir, nodes)
+            embed = MockEmbedProvider(vec)
+
+            result = hybrid_search(store, embed, "test", vector_top_k=10, final_top_k=5)
+            assert "vector_search_active" in result.diagnostics
+            assert "keyword_search_active" in result.diagnostics
+            assert "reranker_applied" in result.diagnostics
+            assert "degraded" in result.diagnostics

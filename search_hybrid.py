@@ -190,7 +190,9 @@ def _apply_importance_weighting(
         except (TypeError, ValueError):
             importance = 0.5
 
-        # Clamp to [0, 1]
+        # Guard against NaN/Inf, then clamp to [0, 1]
+        if math.isnan(importance) or math.isinf(importance):
+            importance = 0.5
         importance = max(0.0, min(1.0, importance))
 
         factor = (1.0 - weight) + weight * importance
