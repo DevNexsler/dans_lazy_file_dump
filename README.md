@@ -19,8 +19,8 @@ Uses **Qwen3-Embedding-8B** (via OpenRouter) for embeddings, **GPT-4.1 Mini** (v
 ### 1. Install
 
 ```bash
-git clone https://github.com/DevNexsler/dans_lazy_file_dump.git
-cd dans_lazy_file_dump
+git clone https://github.com/DevNexsler/RAG-In-A-Box.git
+cd RAG-In-A-Box
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -226,16 +226,16 @@ Document Collection                    AI Assistants
 ## Run tests
 
 ```bash
-python -m pytest tests/ -m "not live" -x    # ~320 offline tests (no API keys)
-python -m pytest tests/ -x                   # ~358 full suite (requires API keys)
+python -m pytest tests/ -m "not live" -x    # ~370 offline tests (no API keys)
+python -m pytest tests/ -x                   # ~454 full suite (requires API keys)
 ```
 
 ## Project layout
 
 ```
 core/                        Config, storage interface, taxonomy helpers
-providers/embed/             Embedding providers (OpenRouter, Ollama, Baseten, LlamaIndex)
-providers/llm/               LLM providers (OpenRouter, Ollama, Baseten)
+providers/embed/             Embedding providers (OpenRouter, Ollama, LlamaIndex)
+providers/llm/               LLM providers (OpenRouter, Ollama)
 providers/ocr/               OCR providers (Gemini Vision, DeepSeek OCR2)
 taxonomy_store.py            Taxonomy LanceDB store (CRUD, vector search, FTS)
 doc_enrichment.py            LLM metadata extraction (with taxonomy integration)
@@ -253,7 +253,11 @@ config.vps.yaml.example      VPS/container config template
 Dockerfile                   Docker image (Python 3.13-slim, no GPU)
 .dockerignore                Docker build exclusions
 render.yaml                  Render.com deployment descriptor
-tests/                       ~358 tests
+tests/                       ~454 tests
 docs/architecture.md         Search pipeline, schema, component details
 docs/vps-architecture.md     VPS/cloud deployment architecture
 ```
+
+## License
+
+[PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/) — free for personal, research, educational, and nonprofit use. Commercial use requires a separate license.
