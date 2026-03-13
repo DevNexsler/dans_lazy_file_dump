@@ -264,3 +264,66 @@ class TestBatchAdd:
 
     def test_add_batch_empty(self, store):
         assert store.add_batch([]) == 0
+
+
+# ---------------------------------------------------------------------------
+# Stale connection / table-already-exists regression
+# ---------------------------------------------------------------------------
+
+class TestStaleConnectionRecovery:
+    """Verify that a new TaxonomyStore instance can write to a table
+    that was created by a previous instance (simulates container restart,
+    volume remount, or MCP server re-init with existing data on disk)."""
+
+    def test_second_instance_can_add(self, tmp_path):
+        """Creating a second store on the same dir should not crash on add."""
+        store1 = TaxonomyStore(str(tmp_path), table_name="taxonomy", embed_fn=_fake_embed)
+        store1.add("tag", "first-tag", "Created by store1")
+        assert store1.count() == 1
+
+        # Simulate restart: new instance, same directory
+        store2 = TaxonomyStore(str(tmp_path), table_name="taxonomy", embed_fn=_fake_embed)
+        store2.add("tag", "second-tag", "Created by store2")
+        assert store2.count() == 2
+
+    def test_stale_table_handle_recovers_on_add(self, tmp_path):
+        """If _table is forced to None (simulating stale state), add should recover."""
+        store = TaxonomyStore(str(tmp_path), table_name="taxonomy", embed_fn=_fake_embed)
+        store.add("tag", "existing", "Already here")
+        assert store.count() == 1
+
+        # Simulate stale state: table exists on disk but handle is lost
+        store._table = None
+        # This would previously crash with "Table 'taxonomy' already exists"
+        store.add("tag", "new-tag", "Added after stale reset")
+        assert store.count() == 2
+        assert store.get("tag:new-tag") is not None
+
+    def test_stale_table_handle_recovers_on_read(self, tmp_path):
+        """If _table is forced to None, read operations should still find data."""
+        store = TaxonomyStore(str(tmp_path), table_name="taxonomy", embed_fn=_fake_embed)
+        store.add("tag", "visible", "Should be found")
+
+        store._table = None
+        # Should recover and find the entry
+        result = store.get("tag:visible")
+        assert result is not None
+        assert result["name"] == "visible"
+
+    def test_stale_table_handle_recovers_on_list(self, tmp_path):
+        """list_by_kind should recover from stale _table = None."""
+        store = TaxonomyStore(str(tmp_path), table_name="taxonomy", embed_fn=_fake_embed)
+        store.add("tag", "listed", "Should appear in list")
+
+        store._table = None
+        results = store.list_by_kind("tag")
+        assert len(results) == 1
+
+    def test_stale_table_handle_recovers_on_count(self, tmp_path):
+        """count() should recover from stale _table = None."""
+        store = TaxonomyStore(str(tmp_path), table_name="taxonomy", embed_fn=_fake_embed)
+        store.add("folder", "test-folder", "A folder")
+
+        store._table = None
+        assert store.count() == 1
+        assert store.count("folder") == 1
