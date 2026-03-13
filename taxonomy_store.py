@@ -55,11 +55,36 @@ class TaxonomyStore:
         self._table = self._open_or_create()
 
     def _open_or_create(self):
-        if self.table_name in self._db.list_tables():
+        try:
+            tables = self._db.list_tables()
+        except Exception:
+            tables = []
+        if self.table_name in tables:
             return self._db.open_table(self.table_name)
         return None  # created lazily on first add
 
+    def _ensure_table(self) -> None:
+        """Re-check disk and open the table if it exists but _table is None.
+
+        Handles stale connection state (container restart, volume remount,
+        long idle) where list_tables() missed the table at init time but
+        it exists on disk now.
+        """
+        if self._table is not None:
+            return
+        try:
+            self._table = self._db.open_table(self.table_name)
+            logger.info("Taxonomy table '%s' found on disk (was not open)", self.table_name)
+        except Exception:
+            pass  # table truly doesn't exist
+
     def _create_table(self, data: list[dict]) -> None:
+        # Guard: table may exist on disk even though _table is None
+        self._ensure_table()
+        if self._table is not None:
+            # Table exists — just add data instead of re-creating
+            self._table.add(data)
+            return
         self._table = self._db.create_table(self.table_name, data)
         try:
             self._table.create_scalar_index("id", index_type="BTREE", replace=True)
@@ -146,6 +171,7 @@ class TaxonomyStore:
 
     def get(self, entry_id: str) -> dict | None:
         """Get a single entry by id."""
+        self._ensure_table()
         if self._table is None:
             return None
         esc = _sql_escape(entry_id)
@@ -187,6 +213,7 @@ class TaxonomyStore:
 
     def delete(self, entry_id: str) -> bool:
         """Hard delete an entry. Returns True if found and deleted."""
+        self._ensure_table()
         if self._table is None:
             return False
         existing = self.get(entry_id)
@@ -206,6 +233,7 @@ class TaxonomyStore:
 
     def list_by_kind(self, kind: str, status: str = "active") -> list[dict]:
         """List entries filtered by kind and status."""
+        self._ensure_table()
         if self._table is None:
             return []
         esc_kind = _sql_escape(kind)
@@ -223,6 +251,7 @@ class TaxonomyStore:
 
     def search(self, query: str, kind: str | None = None, top_k: int = 10) -> list[dict]:
         """Semantic search on embedded descriptions."""
+        self._ensure_table()
         if self._table is None:
             return []
         vector = self._embed(query)
@@ -236,6 +265,7 @@ class TaxonomyStore:
 
     def fts_search(self, query: str, kind: str | None = None, top_k: int = 10) -> list[dict]:
         """Full-text search on description field using tantivy."""
+        self._ensure_table()
         if self._table is None:
             return []
         try:
@@ -317,6 +347,7 @@ class TaxonomyStore:
 
     def count(self, kind: str | None = None) -> int:
         """Count entries, optionally filtered by kind."""
+        self._ensure_table()
         if self._table is None:
             return 0
         if kind:
